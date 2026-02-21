@@ -1,0 +1,410 @@
+require('dotenv').config();
+
+const http = require('http');
+const express = require('express');
+const { Server } = require('socket.io');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const fsPromises = require('fs/promises');
+const path = require('path');
+const helmet = require('helmet');
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const logger = require('./logger');
+const { verifyToken, verifySocketToken } = require('./middleware/auth');
+const dbPromise = require('./database');
+
+const app = express();
+const server = http.createServer(app);
+
+const PORT = process.env.PORT || 3001;
+const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
+const DATA_PATH = path.join(__dirname, 'data');
+
+let waClient = null;
+let waStatus = 'DISCONNECTED';
+let isCampaignRunning = false;
+
+const io = new Server(server, {
+  cors: { origin: process.env.CORS_ORIGIN || "*" }
+});
+
+//===============================
+// AUTO CLEAN CHROMIUS LOCKS
+//===============================
+
+const fs = require('fs');
+
+function cleanChromiumLocks(dir) {
+
+  const lockFiles = [
+    'SingletonLock',
+    'SingletonSocket',
+    'SingletonCookie',
+    'lockfile'
+  ];
+
+  function walk(currentPath) {
+
+    if (!fs.existsSync(currentPath)) return;
+
+    const files = fs.readdirSync(currentPath);
+
+    for (const file of files) {
+      const full = path.join(currentPath, file);
+
+      if (fs.lstatSync(full).isDirectory()) {
+        walk(full);
+      } else if (lockFiles.includes(file)) {
+        try {
+          fs.unlinkSync(full);
+          logger.warn(`Removed lock file: ${full}`);
+        } catch (err) {
+          logger.error({ err }, 'Failed removing lock file');
+        }
+      }
+    }
+  }
+
+  walk(dir);
+}
+
+
+// ===============================
+// ACTIVITY
+// ===============================
+function emitActivity(type, message, meta = {}) {
+  io.emit('activity', {
+    id: `act_${Date.now()}`,
+    type,
+    message,
+    meta,
+    timestamp: new Date().toISOString()
+  });
+}
+
+
+// ===============================
+// SECURITY
+// ===============================
+app.use(helmet());
+app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
+app.use(express.json({ limit: '15mb' }));
+
+
+// ===============================
+// LOGIN
+// ===============================
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+
+  if (
+    username === process.env.ADMIN_USERNAME &&
+    password === process.env.ADMIN_PASSWORD
+  ) {
+    const token = jwt.sign(
+      { username },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    return res.json({ success: true, token });
+  }
+
+  return res.status(401).json({ success: false });
+});
+
+
+// ===============================
+// PROTECTED ROUTES
+// ===============================
+const apiRouter = require('./routes/api');
+app.use('/api', verifyToken, apiRouter);
+
+
+// ===============================
+// STATUS
+// ===============================
+function changeStatus(newStatus) {
+  waStatus = newStatus;
+  io.emit('status_change', waStatus);
+}
+
+
+// ===============================
+// WHATSAPP INIT
+// ===============================
+async function initializeWhatsAppClient() {
+
+  if (waClient) {
+    logger.info('WhatsApp already initialized');
+    return;
+  }
+
+  try {
+    logger.info('Cleaning Chromium locks...');
+    cleanChromiumLocks(SESSION_PATH);
+
+    await new Promise(r => setTimeout(r, 1500));
+
+    logger.info('Initializing WhatsApp Client...');
+
+    waClient = new Client({
+      authStrategy: new LocalAuth({ dataPath: SESSION_PATH }),
+      puppeteer: {
+        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu'
+        ]
+      }
+    });
+
+    waClient.on('qr', (qr) => {
+      logger.info('QR GENERATED');
+      changeStatus('SCAN_QR');
+      io.emit('qr_code', qr);
+    });
+
+    waClient.on('ready', () => {
+      logger.info('WhatsApp READY');
+      changeStatus('CONNECTED');
+      emitActivity('whatsapp', 'WhatsApp connected');
+    });
+
+    waClient.on('disconnected', () => {
+      logger.info('WhatsApp DISCONNECTED');
+      changeStatus('DISCONNECTED');
+      waClient = null;
+      emitActivity('whatsapp', 'WhatsApp disconnected');
+    });
+
+    await waClient.initialize();
+
+  } catch (err) {
+    logger.error({ err, msg: 'WA INIT ERROR' });
+    changeStatus('FAILED');
+  }
+}
+
+
+// ===============================
+// SAFE RESET
+// ===============================
+async function resetWhatsApp() {
+  try {
+    logger.info("RESET WA CLICKED");
+
+    if (waClient) {
+      await waClient.destroy();
+      waClient = null;
+    }
+
+    await new Promise(r => setTimeout(r, 1500));
+
+    await fsPromises.rm(SESSION_PATH, {
+      recursive: true,
+      force: true
+    });
+
+    changeStatus('DISCONNECTED');
+    emitActivity('whatsapp', 'Session reset');
+
+  } catch (err) {
+    logger.error({ err, msg: "RESET FAILED" });
+  }
+}
+
+
+// ===============================
+// CAMPAIGN START
+// ===============================
+app.post('/api/campaigns/start', verifyToken, async (req, res) => {
+
+  if (isCampaignRunning) {
+    return res.status(409).json({ success: false, message: 'Campaign already running' });
+  }
+
+  if (waStatus !== 'CONNECTED') {
+    return res.status(400).json({ success: false, message: 'WhatsApp not connected' });
+  }
+
+  const { templateId, groupIds } = req.body;
+  const db = await dbPromise;
+  const runId = `run_${Date.now()}`;
+
+  try {
+
+    // ✅ FIXED: campaign_runs restored
+    await db.run(
+      `INSERT INTO campaign_runs
+       (id, campaignTemplateId, targetGroupIds, status, createdAt)
+       VALUES (?, ?, ?, ?, ?)`,
+      runId,
+      templateId,
+      JSON.stringify(groupIds),
+      'Sending',
+      new Date().toISOString()
+    );
+
+    // ✅ FIXED: SINGLE reports insert (with delivered)
+    await db.run(
+      `INSERT INTO reports
+        (campaignRunId, totalContacts, sent, failed, delivered, read, progress)
+        VALUES (?, ?, 0, 0, 0, 0, 0)`,
+      runId,
+      0
+    );
+
+    isCampaignRunning = true;
+
+    emitActivity('campaign_started', 'Campaign started', { runId });
+
+    processRun(runId, templateId, groupIds);
+
+    return res.json({ success: true, runId });
+
+  } catch (err) {
+    logger.error(err);
+    return res.status(500).json({ success: false });
+  }
+});
+
+
+// ===============================
+// CAMPAIGN PROCESS
+// ===============================
+async function processRun(runId, templateId, groupIds) {
+
+  const db = await dbPromise;
+
+  let sent = 0;
+  let failed = 0;
+
+  try {
+
+    const template = await db.get(
+      'SELECT * FROM campaign_templates WHERE id=?',
+      templateId
+    );
+
+    const contacts = await db.all(`SELECT * FROM contacts`);
+
+    for (let i = 0; i < contacts.length; i++) {
+
+      const phone = contacts[i].phone;
+
+      try {
+        await waClient.sendMessage(`${phone}@c.us`, template.message);
+        sent++;
+        emitActivity('message_sent', `Sent to ${phone}`);
+      } catch {
+        failed++;
+        emitActivity('message_failed', `Failed to ${phone}`);
+      }
+
+      const progress = ((i + 1) / contacts.length) * 100;
+
+      await db.run(
+        `UPDATE reports
+         SET sent=?,
+             failed=?,
+             delivered=?,
+             read=?,
+             progress=?
+         WHERE campaignRunId=?`,
+        sent,
+        failed,
+        0,  // Delivered Placeholder for now
+        0,  // Read Placeholder for now
+        progress,
+        runId
+      );
+
+      io.emit('campaign_progress', { runId, sent, failed, progress });
+
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    await db.run("UPDATE campaign_runs SET status='Sent' WHERE id=?", runId);
+
+    emitActivity('campaign_completed', 'Campaign completed', { runId });
+
+  } catch (err) {
+
+    emitActivity('campaign_failed', 'Campaign failed', { runId });
+
+    await db.run("UPDATE campaign_runs SET status='Failed' WHERE id=?", runId);
+  }
+
+  isCampaignRunning = false;
+}
+
+
+// ===============================
+// SOCKET
+// ===============================
+io.use(verifySocketToken);
+
+io.on('connection', (socket) => {
+
+  logger.info(`Socket connected: ${socket.id}`);
+
+  socket.emit('status_change', waStatus);
+
+  socket.on('connect_wa', async () => {
+    logger.info('CONNECT WA CLICKED');
+
+    if (waStatus === 'CONNECTED' || waStatus === 'CONNECTING') return;
+
+    changeStatus('CONNECTING');
+    await initializeWhatsAppClient();
+  });
+
+  socket.on('disconnect_wa', async () => {
+    logger.info('DISCONNECT WA CLICKED');
+
+    if (waClient) {
+      await waClient.destroy();
+      waClient = null;
+    }
+
+    changeStatus('DISCONNECTED');
+  });
+
+  socket.on('reset_wa', async () => {
+    await resetWhatsApp();
+  });
+
+  socket.on('disconnect', () => {
+    logger.info(`Socket disconnected: ${socket.id}`);
+  });
+
+});
+
+
+// ===============================
+// FRONTEND
+// ===============================
+const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+app.use(express.static(clientBuildPath));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
+
+
+// ===============================
+// START
+// ===============================
+async function startServer() {
+  await fsPromises.mkdir(DATA_PATH, { recursive: true });
+  await dbPromise;
+
+  server.listen(PORT, '0.0.0.0', () => {
+    logger.info(`Server running on port ${PORT}`);
+  });
+}
+
+startServer();

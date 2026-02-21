@@ -1,0 +1,33 @@
+services:
+  campblast:
+    build: .
+    container_name: campblast-app
+    ports:
+      - "3001:3001"
+
+    env_file:
+      - production.env
+
+    volumes:
+      - ./campblast_session:/app/server/.wwebjs_auth
+      - ./campblast_data:/app/server/data
+
+    restart: unless-stopped
+    shm_size: "1gb"
+
+    stop_grace_period: 40s   # ✅ Critical for Chromium cleanup
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+volumes:
+  campblast_session:
+  campblast_data:

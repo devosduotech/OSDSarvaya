@@ -1,0 +1,45 @@
+
+# Node.js
+node_modules
+npm-debug.log
+.DS_Store
+
+# Server session data
+server/.wwebjs_auth/
+
+# Client build output
+client/dist
+client/node_modules
+
+# IDE and OS files
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment files
+.env
+.env.local
+production.env
+
+# Logs
+*.log
+logs
+
+# Git
+.git
+.gitignore
+
+# Documentation (optional but cleaner)
+README.md
+USER_MANUAL.md
+DEPLOYMENT_GUIDE.md
+
+# Docker files not needed inside image
+docker-compose.yml
+
+# OS temp files
+Thumbs.db
