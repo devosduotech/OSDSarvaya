@@ -5,6 +5,15 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { UploadIcon } from '../components/icons/Icons';
 
+const CLIENT_VERSION = '1.0.0';
+
+interface ServerVersion {
+  appVersion: string;
+  apiVersion: string;
+  environment: string;
+  timestamp: string;
+}
+
 const Settings: React.FC = () => {
 
   const {
@@ -30,10 +39,18 @@ const Settings: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [serverVersion, setServerVersion] = useState<ServerVersion | null>(null);
 
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
+
+  useEffect(() => {
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(setServerVersion)
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (whatsAppStatus === 'SCAN_QR' && qrCode) {
@@ -282,7 +299,11 @@ const Settings: React.FC = () => {
           </div>
 
         </div>
-        <div className="pt-8">
+      </Card>
+
+      {/* SECURITY */}
+      <Card>
+        <div className="pt-4">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
             Security
           </h3>
@@ -315,6 +336,35 @@ const Settings: React.FC = () => {
               </Button>
             </div>
 
+          </div>
+        </div>
+      </Card>
+
+      {/* VERSION INFO */}
+      <Card>
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold dark:text-white">About & Version</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Application version information for support
+          </p>
+
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
+              <span className="text-gray-500 dark:text-gray-400">Client Version</span>
+              <p className="font-semibold dark:text-white">{CLIENT_VERSION}</p>
+            </div>
+            <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
+              <span className="text-gray-500 dark:text-gray-400">Server Version</span>
+              <p className="font-semibold dark:text-white">{serverVersion?.appVersion || 'Loading...'}</p>
+            </div>
+            <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
+              <span className="text-gray-500 dark:text-gray-400">API Version</span>
+              <p className="font-semibold dark:text-white">{serverVersion?.apiVersion || 'Loading...'}</p>
+            </div>
+            <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
+              <span className="text-gray-500 dark:text-gray-400">Environment</span>
+              <p className="font-semibold dark:text-white">{serverVersion?.environment || 'Loading...'}</p>
+            </div>
           </div>
         </div>
       </Card>

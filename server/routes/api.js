@@ -4,6 +4,21 @@ const router = express.Router();
 const dbPromise = require('../database');
 const logger = require('../logger');
 
+const APP_VERSION = '1.0.0';
+const API_VERSION = 'v1';
+
+// =====================================================
+// VERSION INFO
+// =====================================================
+router.get('/version', (req, res) => {
+    res.json({
+        appVersion: APP_VERSION,
+        apiVersion: API_VERSION,
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString()
+    });
+});
+
 // =====================================================
 // PHONE VALIDATION
 // =====================================================

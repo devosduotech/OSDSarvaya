@@ -14,6 +14,9 @@ const logger = require('./logger');
 const { verifyToken, verifySocketToken } = require('./middleware/auth');
 const dbPromise = require('./database');
 
+const APP_VERSION = '1.0.0';
+const API_VERSION = 'v1';
+
 const app = express();
 const server = http.createServer(app);
 
@@ -128,6 +131,19 @@ async function emitActivity(type, message, meta = {}) {
 app.use(helmet());
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
 app.use(express.json({ limit: '15mb' }));
+
+
+// =====================================================
+// VERSION INFO (public endpoint)
+// =====================================================
+app.get('/api/version', (req, res) => {
+  res.json({
+    appVersion: APP_VERSION,
+    apiVersion: API_VERSION,
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  });
+});
 
 
 // =====================================================
@@ -873,7 +889,7 @@ async function startServer() {
   await dbPromise;
 
   server.listen(PORT, '0.0.0.0', () => {
-    logger.info(`Server running on port ${PORT}`);
+    logger.info(`CampBlast Server v${APP_VERSION} (API ${API_VERSION}) running on port ${PORT}`);
   });
 }
 

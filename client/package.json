@@ -53,8 +53,7 @@
     "extraResources": [
       {
         "from": "server/",
-        "to": "server/",
-        "filter": ["**/*", "!node_modules", "!package-lock.json"]
+        "to": "server/"
       }
     ],
     "win": {

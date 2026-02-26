@@ -19,19 +19,21 @@ const PORT = 3001;
 const SERVER_URL = `http://localhost:${PORT}`;
 
 function getServerPath() {
-  if (isDev) {
-    return path.join(__dirname, '..', 'server');
-  }
+  const resourcesPath = process.resourcesPath;
   
   if (app.isPackaged) {
-    const resourcesPath = process.resourcesPath;
-    const serverPath = path.join(resourcesPath, 'app.asar.unpacked', 'server');
+    const serverPath = path.join(resourcesPath, 'server');
     
     if (fs.existsSync(serverPath)) {
+      log.info(`Server found at: ${serverPath}`);
       return serverPath;
     }
     
-    return path.join(resourcesPath, 'app', 'server');
+    log.error(`Server not found at: ${serverPath}`);
+  }
+  
+  if (isDev) {
+    return path.join(__dirname, '..', 'server');
   }
   
   return path.join(__dirname, '..', 'server');
@@ -84,7 +86,14 @@ function startServer() {
 function createWindow() {
   const iconPath = isDev 
     ? path.join(__dirname, '..', 'public', 'favicon.ico')
-    : path.join(process.resourcesPath, 'app', 'dist', 'favicon.ico');
+    : path.join(app.getAppPath(), 'dist', 'favicon.ico');
+  
+  const htmlPath = isDev
+    ? path.join(__dirname, '..', 'dist', 'index.html')
+    : path.join(app.getAppPath(), 'dist', 'index.html');
+  
+  log.info('Loading HTML from:', htmlPath);
+  log.info('HTML path exists:', fs.existsSync(htmlPath));
   
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -114,8 +123,6 @@ function createWindow() {
   if (isDev) {
     mainWindow.loadURL(SERVER_URL);
   } else {
-    const htmlPath = path.join(process.resourcesPath, 'app', 'dist', 'index.html');
-    log.info('Loading HTML from:', htmlPath);
     mainWindow.loadFile(htmlPath);
   }
 
