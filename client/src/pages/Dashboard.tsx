@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
@@ -20,16 +20,19 @@ const Dashboard: React.FC = () => {
 
   const [selectedCampaignRunId, setSelectedCampaignRunId] = useState<string>('');
   const [alert, setAlert] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const shownAlertsRef = useRef<Set<string>>(new Set());
 
-  // Show alert when campaign fails (only for recent failures within last 2 minutes)
+  // Show alert when campaign fails (only once per failed campaign)
   useEffect(() => {
     const latestRun = campaignRuns[campaignRuns.length - 1];
     if (latestRun) {
-      const runTime = new Date(latestRun.createdAt).getTime();
-      const now = Date.now();
-      const isRecent = (now - runTime) < 120000; // 2 minutes
+      // Skip if we already showed alert for this specific run
+      if (shownAlertsRef.current.has(latestRun.id)) {
+        return;
+      }
       
-      if (latestRun.status === 'Failed' && isRecent) {
+      if (latestRun.status === 'Failed') {
+        shownAlertsRef.current.add(latestRun.id);
         const failedActivity = activities.find(a => a.type === 'campaign_failed');
         const reason = failedActivity?.message || 'Campaign failed! Check reports for details.';
         setAlert({ type: 'error', message: reason });
