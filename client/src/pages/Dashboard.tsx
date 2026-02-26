@@ -20,13 +20,15 @@ const Dashboard: React.FC = () => {
 
   const [selectedCampaignRunId, setSelectedCampaignRunId] = useState<string>('');
   const [alert, setAlert] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [lastCheckedRunId, setLastCheckedRunId] = useState<string>('');
 
-  // Show alert when campaign fails
+  // Show alert when campaign fails (only for recent failures, not historical)
   useEffect(() => {
     const latestRun = campaignRuns[campaignRuns.length - 1];
     if (latestRun) {
-      if (latestRun.status === 'Failed') {
-        // Find the most recent failure activity
+      // Only show alert for new failures (not previously dismissed or old data)
+      if (latestRun.status === 'Failed' && latestRun.id !== lastCheckedRunId) {
+        setLastCheckedRunId(latestRun.id);
         const failedActivity = activities.find(a => a.type === 'campaign_failed');
         const reason = failedActivity?.message || 'Campaign failed! Check reports for details.';
         setAlert({ type: 'error', message: reason });
@@ -37,7 +39,7 @@ const Dashboard: React.FC = () => {
         }
       }
     }
-  }, [campaignRuns, reports, activities]);
+  }, [campaignRuns, reports, activities, lastCheckedRunId]);
 
   // Auto-hide alert after 10 seconds
   useEffect(() => {
