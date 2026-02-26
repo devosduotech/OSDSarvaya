@@ -26,7 +26,10 @@ const Dashboard: React.FC = () => {
     const latestRun = campaignRuns[campaignRuns.length - 1];
     if (latestRun) {
       if (latestRun.status === 'Failed') {
-        setAlert({ type: 'error', message: `Campaign failed! Check reports for details.` });
+        // Find the most recent failure activity
+        const failedActivity = activities.find(a => a.type === 'campaign_failed');
+        const reason = failedActivity?.message || 'Campaign failed! Check reports for details.';
+        setAlert({ type: 'error', message: reason });
       } else if (latestRun.status === 'Sent') {
         const report = reports.find(r => r.campaignRunId === latestRun.id);
         if (report && report.failed > 0) {
@@ -34,7 +37,7 @@ const Dashboard: React.FC = () => {
         }
       }
     }
-  }, [campaignRuns, reports]);
+  }, [campaignRuns, reports, activities]);
 
   // Auto-hide alert after 10 seconds
   useEffect(() => {
