@@ -4,12 +4,17 @@ const path = require('path');
 const fs = require('fs');
 const log = require('electron-log');
 
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('no-sandbox');
+
 log.transports.file.level = 'info';
 log.transports.console.level = 'info';
 
 log.info('OSDSarvaya starting...');
 log.info('App path:', app.getAppPath());
 log.info('Is packaged:', app.isPackaged);
+log.info('User data path:', app.getPath('userData'));
 
 let serverProcess = null;
 let mainWindow = null;
@@ -19,23 +24,20 @@ const PORT = 3001;
 const SERVER_URL = `http://localhost:${PORT}`;
 
 function getServerPath() {
-  const resourcesPath = process.resourcesPath;
-  
   if (app.isPackaged) {
-    const serverPath = path.join(resourcesPath, 'server');
-    
+    const serverPath = path.join(process.resourcesPath, 'server');
     if (fs.existsSync(serverPath)) {
       log.info(`Server found at: ${serverPath}`);
       return serverPath;
     }
-    
+    const altPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'server');
+    if (fs.existsSync(altPath)) {
+      log.info(`Server found at: ${altPath}`);
+      return altPath;
+    }
     log.error(`Server not found at: ${serverPath}`);
+    return serverPath;
   }
-  
-  if (isDev) {
-    return path.join(__dirname, '..', 'server');
-  }
-  
   return path.join(__dirname, '..', 'server');
 }
 
@@ -45,7 +47,16 @@ function startServer() {
   log.info(`Starting server from: ${serverPath}`);
   log.info(`Server path exists: ${fs.existsSync(serverPath)}`);
   
-  const envFile = path.join(serverPath, 'production.env');
+  let envFile = path.join(serverPath, 'production.env');
+  if (!fs.existsSync(envFile)) {
+    envFile = path.join(process.resourcesPath, 'production.env');
+  }
+  if (!fs.existsSync(envFile) && !app.isPackaged) {
+    envFile = path.join(__dirname, '..', 'production.env');
+  }
+  
+  log.info('Looking for env file at:', envFile);
+  
   let envArgs = [];
   
   if (fs.existsSync(envFile)) {
@@ -84,16 +95,17 @@ function startServer() {
 }
 
 function createWindow() {
-  const iconPath = isDev 
-    ? path.join(__dirname, '..', 'public', 'favicon.ico')
-    : path.join(app.getAppPath(), 'dist', 'favicon.ico');
+  let htmlPath;
   
-  const htmlPath = isDev
-    ? path.join(__dirname, '..', 'dist', 'index.html')
-    : path.join(app.getAppPath(), 'dist', 'index.html');
+  if (isDev) {
+    htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
+  } else {
+    htmlPath = path.join(app.getAppPath(), 'dist', 'index.html');
+  }
   
   log.info('Loading HTML from:', htmlPath);
-  log.info('HTML path exists:', fs.existsSync(htmlPath));
+  log.info('App path:', app.getAppPath());
+  log.info('Resources path:', process.resourcesPath);
   
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -101,7 +113,6 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: 'OSDSarvaya',
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -112,7 +123,18 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    log.info('Main window shown');
+    log.info('Main window shown via ready-to-show');
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    log.info('Content loaded successfully');
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    log.error('Failed to load:', errorCode, errorDescription);
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -134,9 +156,34 @@ function createWindow() {
 app.whenReady().then(() => {
   startServer();
   
-  setTimeout(() => {
-    createWindow();
-  }, 3000);
+  let retries = 0;
+  const maxRetries = 30;
+  
+  const checkServer = () => {
+    const http = require('http');
+    const req = http.get(SERVER_URL, (res) => {
+      if (res.statusCode === 200) {
+        log.info('Server is ready, creating window');
+        createWindow();
+      } else {
+        retry();
+      }
+    });
+    req.on('error', () => retry());
+  };
+  
+  const retry = () => {
+    retries++;
+    if (retries >= maxRetries) {
+      log.error('Server failed to start after max retries');
+      createWindow();
+    } else {
+      log.info(`Waiting for server... (${retries}/${maxRetries})`);
+      setTimeout(checkServer, 1000);
+    }
+  };
+  
+  setTimeout(checkServer, 2000);
 });
 
 app.on('window-all-closed', () => {

@@ -2,7 +2,7 @@
 {
   "name": "osdsarvaya-client",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "OSDSarvaya - WhatsApp Bulk Messaging Application",
   "author": "OSDuo Tech",
   "type": "module",
@@ -48,24 +48,34 @@
       "dist/**/*",
       "electron/**/*",
       "server/**/*",
-      "package.json"
+      "package.json",
+      "../production.env"
     ],
     "extraResources": [
       {
         "from": "server/",
         "to": "server/"
+      },
+      {
+        "from": "../production.env",
+        "to": "server/production.env"
       }
     ],
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": ["x64"]
         }
       ]
     },
-    "portable": {
-      "artifactName": "OSDSarvaya.exe"
+    "nsis": {
+      "artifactName": "OSDSarvayaSetup.exe",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "OSDSarvaya"
     },
     "asar": true,
     "asarUnpack": [
