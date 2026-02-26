@@ -117,11 +117,6 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
 
-  mainWindow.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
   // Try server URL first, then file
   mainWindow.loadURL(SERVER_URL).catch(() => {
     const htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
