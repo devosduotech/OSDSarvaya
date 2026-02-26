@@ -14,7 +14,7 @@ const logger = require('./logger');
 const { verifyToken, verifySocketToken } = require('./middleware/auth');
 const dbPromise = require('./database');
 
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.6';
 const API_VERSION = 'v1';
 
 const app = express();
