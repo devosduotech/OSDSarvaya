@@ -72,6 +72,7 @@
     "nsis": {
       "artifactName": "OSDSarvayaSetup.exe",
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,

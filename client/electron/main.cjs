@@ -100,12 +100,29 @@ function createWindow() {
   if (isDev) {
     htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
   } else {
+    // Multiple fallbacks for packaged app
     htmlPath = path.join(app.getAppPath(), 'dist', 'index.html');
+    if (!fs.existsSync(htmlPath)) {
+      htmlPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'index.html');
+    }
+    if (!fs.existsSync(htmlPath)) {
+      htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
+    }
   }
   
   log.info('Loading HTML from:', htmlPath);
+  log.info('HTML path exists:', fs.existsSync(htmlPath));
   log.info('App path:', app.getAppPath());
   log.info('Resources path:', process.resourcesPath);
+  log.info('__dirname:', __dirname);
+  
+  // List files in app directory for debugging
+  try {
+    const appDir = app.getAppPath();
+    log.info('App directory contents:', fs.readdirSync(appDir).slice(0, 10));
+  } catch (e) {
+    log.error('Cannot read app directory:', e.message);
+  }
   
   mainWindow = new BrowserWindow({
     width: 1400,
