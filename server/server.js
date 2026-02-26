@@ -627,8 +627,26 @@ async function processRun(runId, templateId, groupIds) {
 
     logger.info(`Contacts loaded: ${contacts.length}`);
     
+    // If no contacts found (all opted out), mark as completed with 0 sent
     if (contacts.length === 0) {
-      throw new Error('No contacts found in selected groups (or all opted out)');
+      logger.warn('No opted-in contacts found in selected groups');
+      
+      await db.run(
+        `UPDATE reports SET totalContacts=0, sent=0, failed=0, progress=100 WHERE campaignRunId=?`,
+        runId
+      );
+      
+      await db.run(
+        `UPDATE campaign_runs SET status='Sent' WHERE id=?`,
+        runId
+      );
+      
+      isCampaignRunning = false;
+      currentRunId = null;
+      shouldStopCampaign = false;
+      
+      emitActivity('campaign_completed', 'Campaign completed - no opted-in contacts found in selected groups', { runId });
+      return;
     }
 
     // Get rate limiting setting
