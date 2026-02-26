@@ -7,6 +7,7 @@ const log = require('electron-log');
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('disable-dev-shm-usage');
 
 log.transports.file.level = 'info';
 log.transports.console.level = 'info';
@@ -15,6 +16,7 @@ log.info('OSDSarvaya starting...');
 log.info('App path:', app.getAppPath());
 log.info('Is packaged:', app.isPackaged);
 log.info('User data path:', app.getPath('userData'));
+log.info('Resources path:', process.resourcesPath);
 
 let serverProcess = null;
 let mainWindow = null;
@@ -25,18 +27,22 @@ const SERVER_URL = `http://localhost:${PORT}`;
 
 function getServerPath() {
   if (app.isPackaged) {
-    const serverPath = path.join(process.resourcesPath, 'server');
-    if (fs.existsSync(serverPath)) {
-      log.info(`Server found at: ${serverPath}`);
-      return serverPath;
+    // Try multiple locations for server
+    const locations = [
+      path.join(process.resourcesPath, 'server'),
+      path.join(process.resourcesPath, 'app.asar.unpacked', 'server'),
+      path.join(app.getAppPath(), 'server'),
+    ];
+    
+    for (const serverPath of locations) {
+      if (fs.existsSync(serverPath)) {
+        log.info(`Server found at: ${serverPath}`);
+        return serverPath;
+      }
     }
-    const altPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'server');
-    if (fs.existsSync(altPath)) {
-      log.info(`Server found at: ${altPath}`);
-      return altPath;
-    }
-    log.error(`Server not found at: ${serverPath}`);
-    return serverPath;
+    
+    log.error('Server not found in any location');
+    return locations[0];
   }
   return path.join(__dirname, '..', 'server');
 }
@@ -95,16 +101,65 @@ function startServer() {
 }
 
 function createWindow() {
-  let htmlPath;
+  log.info('Creating main window...');
   
-  if (isDev) {
-    htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
-  } else {
-    // Multiple fallbacks for packaged app
-    htmlPath = path.join(app.getAppPath(), 'dist', 'index.html');
-    if (!fs.existsSync(htmlPath)) {
-      htmlPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'index.html');
-    }
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 1024,
+    minHeight: 700,
+    title: 'OSDSarvaya',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: false,
+      devTools: true
+    },
+    show: false
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    log.info('Main window shown via ready-to-show');
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    log.info('Content loaded successfully');
+    log.info('Current URL:', mainWindow.webContents.getURL());
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    log.error('Failed to load:', errorCode, errorDescription);
+  });
+
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    const levels = ['debug', 'info', 'warn', 'error'];
+    log.info(`Console[${levels[level]}]: ${message}`);
+  });
+
+  mainWindow.setMenuBarVisibility(false);
+
+  mainWindow.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  // Load from local server in both dev and production
+  // This ensures the app works properly
+  mainWindow.loadURL(SERVER_URL).catch(err => {
+    log.error('Failed to load URL:', err);
+    // Fallback to file if server fails
+    const htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
+    log.info('Trying fallback to file:', htmlPath);
+    mainWindow.loadFile(htmlPath).catch(e => {
+      log.error('Failed to load file:', e);
+    });
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
     if (!fs.existsSync(htmlPath)) {
       htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
     }
