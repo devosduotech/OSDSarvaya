@@ -23,9 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
-# CampBlast specific
-campblast_data/
-campblast_session/
+# OSDSarvaya specific
+osdsarvaya_data/
+osdsarvaya_session/
 production.env
 
 # Electron build

@@ -1,8 +1,8 @@
 
-# CampBlast - User Manual
+# OSDSarvaya - User Manual
 
 ## 1. Introduction
-Welcome to CampBlast! This document guides you through the setup, configuration, and usage of the CampBlast application, now updated with production-ready features for security and reliability.
+Welcome to OSDSarvaya! This document guides you through the setup, configuration, and usage of the OSDSarvaya application, now updated with production-ready features for security and reliability.
 
 ---
 ## 2. Configuration
@@ -24,16 +24,16 @@ ADMIN_PASSWORD=your_secure_password
 | `PORT`           | The port the server will run on.                                          |
 | `CORS_ORIGIN`    | The URL of your frontend. Must be set for security.                       |
 | `JWT_SECRET`     | A long, random string for securing login sessions.                        |
-| `ADMIN_USERNAME` | The username for logging into the application.                            |
-| `ADMIN_PASSWORD` | The password for logging into the application. **Change this!**           |
+| `ADMIN_USERNAME` | The username for logging into the application.                          |
+| `ADMIN_PASSWORD` | The password for logging into the application. **Change this!**         |
 
 ---
 ## 3. Production Deployment (Recommended)
-The recommended way to deploy CampBlast is using the provided `Dockerfile`.
+The recommended way to deploy OSDSarvaya is using the provided `Dockerfile`.
 
 ### 3.1. Building the Docker Image
 1.  Navigate to the project's root directory.
-2.  Run the build command: `docker build -t campblast .`
+2.  Run the build command: `docker build -t osdsarvaya .`
 
 ### 3.2. Running the Docker Container
 Run the container with volumes to persist your WhatsApp session and database, and an environment file for configuration.
@@ -41,15 +41,15 @@ Run the container with volumes to persist your WhatsApp session and database, an
 1. Create your `production.env` file in a secure location on your host with the production configuration from section 2.
 2. Run the command:
 ```bash
-docker run -d -p 3001:3001 --name campblast-app \
-  -v campblast_session:/app/server/.wwebjs_auth \
-  -v campblast_data:/app/server/data \
+docker run -d -p 3001:3001 --name osdsarvaya-app \
+  -v osdsarvaya_session:/app/server/.wwebjs_auth \
+  -v osdsarvaya_data:/app/server/data \
   --env-file ./path/to/your/production.env \
   --restart unless-stopped \
-  campblast
+  osdsarvaya
 ```
-*   `-v campblast_session:/app/server/.wwebjs_auth`: **(Critical)** Persists your WhatsApp login session.
-*   `-v campblast_data:/app/server/data`: **(Critical)** Persists your SQLite database file.
+*   `-v osdsarvaya_session:/app/server/.wwebjs_auth`: **(Critical)** Persists your WhatsApp login session.
+*   `-v osdsarvaya_data:/app/server/data`: **(Critical)** Persists your SQLite database file.
 *   `--env-file`: Securely passes your configuration to the container.
 
 ### 3.3. Accessing the Application
@@ -83,7 +83,7 @@ Navigate your browser to `http://<your_server_ip>:3001`.
 ---
 ## 6. Troubleshooting
 For connection issues, the first step is always to check the logs.
-- **Docker:** `docker logs -f campblast-app`
+- **Docker:** `docker logs -f osdsarvaya-app`
 - **Local Development:** Check the terminal where you ran `npm start` in the `server` directory.
 
 Common errors are related to missing system dependencies for the browser automation, which are handled by the Dockerfile but may be missing on a local machine.

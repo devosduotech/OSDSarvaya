@@ -100,7 +100,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   const [activities, setActivities] = useState<Activity[]>([]);
   const [settings, setSettings] = useState({ messagesPerHour: 65 });
 
-  const [token, setToken] = useLocalStorage<string | null>('campblast_token', null);
+  const [token, setToken] = useLocalStorage<string | null>('osdsarvaya_token', null);
   const isAuthenticated = !!token;
 
   const [isLoading, setIsLoading] = useState(false);

@@ -36,7 +36,7 @@ interface UpdateInfo {
 }
 
 function getMachineId(): string {
-  const key = 'campblast_machine_id';
+  const key = 'osdsarvaya_machine_id';
   
   let machineId = localStorage.getItem(key);
   
@@ -54,7 +54,7 @@ function getMachineId(): string {
 }
 
 function getLicenseInfo(): LicenseInfo | null {
-  const key = 'campblast_license';
+  const key = 'osdsarvaya_license';
   const data = localStorage.getItem(key);
   
   if (!data) return null;
@@ -67,11 +67,11 @@ function getLicenseInfo(): LicenseInfo | null {
 }
 
 function saveLicenseInfo(info: LicenseInfo): void {
-  localStorage.setItem('campblast_license', JSON.stringify(info));
+  localStorage.setItem('osdsarvaya_license', JSON.stringify(info));
 }
 
 function clearLicenseInfo(): void {
-  localStorage.removeItem('campblast_license');
+  localStorage.removeItem('osdsarvaya_license');
 }
 
 async function activateLicense(licenseKey: string): Promise<{ licenseKey: string; success: boolean; message: string; customerEmail?: string; customerName?: string }> {

@@ -1,9 +1,9 @@
 
 {
-  "name": "campblast-client",
+  "name": "osdsarvaya-client",
   "private": true,
-  "version": "1.0.2",
-  "description": "CampBlast - WhatsApp Bulk Messaging Application",
+  "version": "1.0.3",
+  "description": "OSDSarvaya - WhatsApp Bulk Messaging Application",
   "author": "OSDuo Tech",
   "type": "module",
   "main": "electron/main.cjs",
@@ -39,8 +39,8 @@
     "vite": "^5.2.0"
   },
   "build": {
-    "appId": "com.campblast.app",
-    "productName": "CampBlast",
+    "appId": "com.osdsarvaya.app",
+    "productName": "OSDSarvaya",
     "directories": {
       "output": "release"
     },
@@ -65,7 +65,7 @@
       ]
     },
     "portable": {
-      "artifactName": "CampBlast.exe"
+      "artifactName": "OSDSarvaya.exe"
     },
     "asar": true,
     "asarUnpack": [

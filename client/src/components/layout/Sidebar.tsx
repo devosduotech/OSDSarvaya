@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import logo from '../../assets/logo.png';
+import logo from '../../assets/Logo.png';
+import { APP_VERSION } from '../../version';
 import {
   DashboardIcon,
   CampaignsIcon,
@@ -19,9 +20,6 @@ const Sidebar: React.FC = () => {
 
   const activeLinkClasses =
     "bg-blue-600 text-white font-semibold";
-
-  // Version
-  const APP_VERSION = "v1.0.0";
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-slate-800 text-white">
@@ -42,7 +40,7 @@ const Sidebar: React.FC = () => {
           onClick={() => navigate('/dashboard')}
           className="text-lg font-semibold tracking-wide cursor-pointer"
         >
-          CampBlast
+          OSDSarvaya
         </h1>
 
         {/* Branding */}

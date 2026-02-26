@@ -67,7 +67,7 @@ const LicenseInput: React.FC<LicenseInputProps> = ({ onActivated }) => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">
-            CampBlast
+            OSDSarvaya
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
             WhatsApp Bulk Messaging Application
@@ -86,7 +86,7 @@ const LicenseInput: React.FC<LicenseInputProps> = ({ onActivated }) => {
             </div>
             <h2 className="text-xl font-semibold dark:text-white">License Activation</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Enter your license key to activate CampBlast
+              Enter your license key to activate OSDSarvaya
             </p>
           </div>
 

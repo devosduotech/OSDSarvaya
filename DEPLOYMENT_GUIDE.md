@@ -1,8 +1,7 @@
 
+# OSDSarvaya - Installation & Deployment Guide
 
-# CampBlast - Installation & Deployment Guide
-
-This guide covers installing CampBlast on Windows and Ubuntu.
+This guide covers installing OSDSarvaya on Windows and Ubuntu.
 
 ---
 
@@ -19,14 +18,14 @@ This guide covers installing CampBlast on Windows and Ubuntu.
 # Windows Installation
 
 ## Files Needed
-Copy `CampBlast.exe` to the Windows laptop (via USB or Google Drive)
+Copy `OSDSarvaya.exe` to the Windows laptop (via USB or Google Drive)
 
-**Location:** `client/release/CampBlast.exe` (~69 MB)
+**Location:** `client/release/OSDSarvaya.exe` (~69 MB)
 
 ## Installation Steps
 
 ### Step 1: Copy & Run
-1. Copy `CampBlast.exe` to any folder (e.g., Desktop)
+1. Copy `OSDSarvaya.exe` to any folder (e.g., Desktop)
 2. Double-click to run
 3. Wait 10-15 seconds for first start
 
@@ -66,8 +65,8 @@ sudo usermod -aG docker $USER
 
 ### Step 2: Clone Repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/CampBlast.git
-cd CampBlast
+git clone https://github.com/YOUR_USERNAME/OSDSarvaya.git
+cd OSDSarvaya
 ```
 
 ### Step 3: Configure Environment
@@ -114,15 +113,15 @@ Login: admin / admin@123
 
 ---
 
-# Managing CampBlast
+# Managing OSDSarvaya
 
 ## Windows
 
 | Action | How |
 |--------|-----|
-| Start | Double-click CampBlast.exe |
+| Start | Double-click OSDSarvaya.exe |
 | Stop | Close the window |
-| View Data | %APPDATA%/CampBlast/ |
+| View Data | %APPDATA%/OSDSarvaya/ |
 
 ## Ubuntu (Docker)
 
@@ -145,7 +144,7 @@ Login: admin / admin@123
 - Check Windows Firewall settings
 
 **Issue:** WhatsApp disconnected
-- Data may be corrupted. Delete `%APPDATA%/CampBlast/` and restart
+- Data may be corrupted. Delete `%APPDATA%/OSDSarvaya/` and restart
 
 ## Ubuntu
 
@@ -171,10 +170,10 @@ docker-compose logs
 
 ---
 
-# Updating CampBlast
+# Updating OSDSarvaya
 
 ## Windows
-Replace `CampBlast.exe` with the new version.
+Replace `OSDSarvaya.exe` with the new version.
 
 ## Ubuntu
 ```bash
@@ -190,16 +189,16 @@ docker-compose up -d --build
 # Data Storage
 
 ## Windows
-- Location: `%APPDATA%/CampBlast/`
+- Location: `%APPDATA%/OSDSarvaya/`
 - Contains: WhatsApp session, database, logs
 
 ## Ubuntu (Docker)
-- Session: Docker volume `campblast_session`
-- Database: Docker volume `campblast_data`
+- Session: Docker volume `osdsarvaya_session`
+- Database: Docker volume `osdsarvaya_data`
 
 To backup:
 ```bash
-docker cp campblast-app:/app/server/data ./backup
+docker cp osdsarvaya-app:/app/server/data ./backup
 ```
 
 ---

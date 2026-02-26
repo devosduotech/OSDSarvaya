@@ -3,7 +3,7 @@
 set -e
 
 echo "=========================================="
-echo "  CampBlast Installation (Ubuntu)"
+echo "  OSDSarvaya Installation (Ubuntu)"
 echo "=========================================="
 
 echo ""
@@ -21,14 +21,14 @@ fi
 echo "Docker already installed."
 
 echo ""
-echo "Step 2: Creating CampBlast directory..."
-mkdir -p ~/campblast
-cd ~/campblast
+echo "Step 2: Creating OSDSarvaya directory..."
+mkdir -p ~/osdsarvaya
+cd ~/osdsarvaya
 
 echo ""
 echo "Step 3: Copying files from repository..."
-echo "Please ensure you have cloned the CampBlast repository here."
-echo "If you haven't, run: git clone https://github.com/YOUR_USERNAME/CampBlast.git"
+echo "Please ensure you have cloned the OSDSarvaya repository here."
+echo "If you haven't, run: git clone https://github.com/YOUR_USERNAME/OSDSarvaya.git"
 
 if [ ! -f docker-compose.yml ]; then
     echo "ERROR: docker-compose.yml not found!"
@@ -54,7 +54,7 @@ EOF
 fi
 
 echo ""
-echo "Step 5: Building and starting CampBlast..."
+echo "Step 5: Building and starting OSDSarvaya..."
 docker-compose up -d --build
 
 echo ""
@@ -62,7 +62,7 @@ echo "=========================================="
 echo "  Installation Complete!"
 echo "=========================================="
 echo ""
-echo "CampBlast is running at: http://localhost:3001"
+echo "OSDSarvaya is running at: http://localhost:3001"
 echo ""
 echo "Default login:"
 echo "  Username: admin"

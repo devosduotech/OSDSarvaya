@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import logo from '../assets/logo.png';
+import logo from '../assets/Logo.png';
 import Button from '../components/ui/Button';
 
 const Login: React.FC = () => {
@@ -19,7 +19,7 @@ const Login: React.FC = () => {
 
   // ✅ Load remembered username
   useEffect(() => {
-    const savedUser = localStorage.getItem('campblast_remember');
+    const savedUser = localStorage.getItem('osdsarvaya_remember');
     if (savedUser) {
       setUsername(savedUser);
     }
@@ -54,9 +54,9 @@ const Login: React.FC = () => {
 
       // ✅ Remember username
       if (remember) {
-        localStorage.setItem('campblast_remember', username);
+        localStorage.setItem('osdsarvaya_remember', username);
       } else {
-        localStorage.removeItem('campblast_remember');
+        localStorage.removeItem('osdsarvaya_remember');
       }
 
       // ✅ REDIRECT (PRIMARY FIX)
@@ -92,7 +92,7 @@ const Login: React.FC = () => {
           />
 
           <h1 className="text-2xl font-semibold tracking-wide text-gray-800 dark:text-white">
-            CampBlast
+            OSDSarvaya
           </h1>
 
           <a

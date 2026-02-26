@@ -1,7 +1,7 @@
 services:
-  campblast:
+  osdsarvaya:
     build: .
-    container_name: campblast-app
+    container_name: osdsarvaya-app
     ports:
       - "3001:3001"
 
@@ -9,8 +9,8 @@ services:
       - production.env
 
     volumes:
-      - ./campblast_session:/app/server/.wwebjs_auth
-      - ./campblast_data:/app/server/data
+      - ./osdsarvaya_session:/app/server/.wwebjs_auth
+      - ./osdsarvaya_data:/app/server/data
 
     restart: unless-stopped
     shm_size: "1gb"
@@ -29,5 +29,5 @@ services:
           memory: 1g
 
 volumes:
-  campblast_session:
-  campblast_data:
+  osdsarvaya_session:
+  osdsarvaya_data:

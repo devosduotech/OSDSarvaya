@@ -14,7 +14,7 @@ const logger = require('./logger');
 const { verifyToken, verifySocketToken } = require('./middleware/auth');
 const dbPromise = require('./database');
 
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 const API_VERSION = 'v1';
 
 const app = express();
@@ -902,7 +902,7 @@ async function startServer() {
   await dbPromise;
 
   server.listen(PORT, '0.0.0.0', () => {
-    logger.info(`CampBlast Server v${APP_VERSION} (API ${API_VERSION}) running on port ${PORT}`);
+    logger.info(`OSDSarvaya Server v${APP_VERSION} (API ${API_VERSION}) running on port ${PORT}`);
   });
 }
 

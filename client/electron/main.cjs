@@ -7,7 +7,7 @@ const log = require('electron-log');
 log.transports.file.level = 'info';
 log.transports.console.level = 'info';
 
-log.info('CampBlast starting...');
+log.info('OSDSarvaya starting...');
 log.info('App path:', app.getAppPath());
 log.info('Is packaged:', app.isPackaged);
 
@@ -100,7 +100,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'CampBlast',
+    title: 'OSDSarvaya',
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       nodeIntegration: false,

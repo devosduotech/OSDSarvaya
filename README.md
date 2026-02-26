@@ -1,6 +1,6 @@
 <div align="center">
 
-# CampBlast
+# OSDSarvaya
 
 WhatsApp Bulk Messaging Application by OSDuo Tech
 
@@ -12,7 +12,7 @@ WhatsApp Bulk Messaging Application by OSDuo Tech
 
 ### Windows
 
-1. Download `CampBlast.exe` from the [releases](../../releases)
+1. Download `OSDSarvaya.exe` from the [releases](../../releases)
 2. Double-click to run
 3. Default login: `admin` / `admin@123`
 4. Scan WhatsApp QR code to connect
@@ -21,7 +21,7 @@ WhatsApp Bulk Messaging Application by OSDuo Tech
 
 ```bash
 # Run the install script
-curl -sSL https://raw.githubusercontent.com/OSDuoTech/CampBlast/main/install-ubuntu.sh | bash
+curl -sSL https://raw.githubusercontent.com/OSDuoTech/OSDSarvaya/main/install-ubuntu.sh | bash
 ```
 
 Or manual installation:
@@ -32,7 +32,7 @@ sudo apt-get update
 sudo apt-get install -y docker.io docker-compose
 
 # Clone or download project
-mkdir campblast && cd campblast
+mkdir osdsarvaya && cd osdsarvaya
 # Add your docker-compose.yml and production.env
 
 # Build and run
