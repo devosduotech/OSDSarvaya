@@ -1,4 +1,4 @@
-import { APP_VERSION } from '../version';
+import { getVersion } from '../version';
 
 const API_BASE = '';
 
@@ -150,7 +150,8 @@ async function validateLicense(): Promise<LicenseValidationResponse> {
 
 async function checkForUpdates(): Promise<UpdateInfo> {
   try {
-    const response = await fetch(`${API_BASE}/api/updates/check?version=${APP_VERSION}`, {
+    const currentVersion = getVersion();
+    const response = await fetch(`${API_BASE}/api/updates/check?version=${currentVersion}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -163,7 +164,7 @@ async function checkForUpdates(): Promise<UpdateInfo> {
     console.error('Update check error:', err);
     return {
       success: false,
-      currentVersion: APP_VERSION,
+      currentVersion: getVersion(),
       updateAvailable: false,
       minVersionOk: true
     };

@@ -14,13 +14,7 @@ const logger = require('./logger');
 const { verifyToken, verifySocketToken } = require('./middleware/auth');
 const dbPromise = require('./database');
 
-const { execSync } = require('child_process');
-let APP_VERSION = '1.0.0';
-try {
-  APP_VERSION = execSync('git describe --tags --abbrev=0', { encoding: 'utf8' }).trim();
-} catch (e) {
-  // Use default version if git describe fails
-}
+const { APP_VERSION } = require('./version');
 const API_VERSION = 'v1';
 
 const app = express();

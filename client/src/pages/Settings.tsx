@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { UploadIcon } from '../components/icons/Icons';
-import { APP_VERSION } from '../version';
+import { getVersion } from '../version';
 
 interface ServerVersion {
   appVersion: string;
@@ -350,7 +350,7 @@ const Settings: React.FC = () => {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
               <span className="text-gray-500 dark:text-gray-400">Client Version</span>
-              <p className="font-semibold dark:text-white">{APP_VERSION}</p>
+              <p className="font-semibold dark:text-white">{getVersion()}</p>
             </div>
             <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
               <span className="text-gray-500 dark:text-gray-400">Server Version</span>

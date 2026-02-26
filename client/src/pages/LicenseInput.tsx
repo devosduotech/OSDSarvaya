@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { licenseService } from '../services/license';
-import { APP_VERSION } from '../version';
+import { getVersion } from '../version';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 
@@ -73,7 +73,7 @@ const LicenseInput: React.FC<LicenseInputProps> = ({ onActivated }) => {
             WhatsApp Bulk Messaging Application
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            Version {APP_VERSION}
+            Version {getVersion()}
           </p>
         </div>
 

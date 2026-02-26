@@ -3,8 +3,8 @@ const express = require('express');
 const router = express.Router();
 const dbPromise = require('../database');
 const logger = require('../logger');
+const { APP_VERSION } = require('../version');
 
-const APP_VERSION = '1.0.0';
 const API_VERSION = 'v1';
 
 // =====================================================

@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import logo from '../../assets/Logo.png';
-import { APP_VERSION } from '../../version';
+import { getVersion } from '../../version';
 import {
   DashboardIcon,
   CampaignsIcon,
@@ -113,7 +113,7 @@ const Sidebar: React.FC = () => {
 
         {/* Version */}
         <div className="text-[11px] text-gray-500">
-          {APP_VERSION}
+          {getVersion()}
         </div>
 
         {/* Copyright */}

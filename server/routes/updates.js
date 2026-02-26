@@ -4,11 +4,10 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const logger = require('../logger');
+const { APP_VERSION } = require('../version');
 
 const UPDATES_DIR = path.join(__dirname, '..', 'updates');
 const UPDATES_JSON = path.join(UPDATES_DIR, 'updates.json');
-
-const APP_VERSION = '1.0.1';
 
 function ensureUpdatesDir() {
     if (!fs.existsSync(UPDATES_DIR)) {
