@@ -27,7 +27,7 @@ const Contacts: React.FC = () => {
     const tags = new Set<string>();
     contacts.forEach(c => {
       if (c.tags) {
-        c.tags.split(',').forEach(t => {
+        c.tags.split(/[;,]/).forEach(t => {
           const trimmed = t.trim();
           if (trimmed) tags.add(trimmed);
         });
@@ -45,7 +45,7 @@ const Contacts: React.FC = () => {
         contact.email?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesTag = !selectedTag || 
-        contact.tags?.split(',').map(t => t.trim()).includes(selectedTag);
+        contact.tags?.split(/[;,]/).map(t => t.trim()).includes(selectedTag);
       
       return matchesSearch && matchesTag;
     });
@@ -83,14 +83,15 @@ const Contacts: React.FC = () => {
       const newContacts: Omit<Contact, 'id'>[] = lines
         .slice(1)
         .map(line => {
-          const [name, phone, email, tags] = line.split(',');
+          const columns = line.split(',');
+          const name = columns[0]?.trim() || '';
+          const phone = columns[1]?.trim() || '';
+          const email = columns[2]?.trim() || '';
+          
+          const tagColumns = columns.slice(3).filter(t => t.trim() !== '');
+          const tags = tagColumns.map(t => t.trim()).join(';');
 
-          return {
-            name: name?.trim() || '',
-            phone: phone?.trim() || '',
-            email: email?.trim() || '',
-            tags: tags?.trim() || ''
-          };
+          return { name, phone, email, tags };
         })
         .filter(c => c.phone);
 

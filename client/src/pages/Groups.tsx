@@ -24,7 +24,7 @@ const Groups: React.FC = () => {
     const tags = new Set<string>();
     contacts.forEach(c => {
       if (c.tags) {
-        c.tags.split(',').forEach(t => {
+        c.tags.split(/[;,]/).forEach(t => {
           const trimmed = t.trim();
           if (trimmed) tags.add(trimmed);
         });
@@ -41,7 +41,7 @@ const Groups: React.FC = () => {
         contact.phone?.includes(contactSearch);
       
       const matchesTag = !selectedTag || 
-        contact.tags?.split(',').map(t => t.trim()).includes(selectedTag);
+        contact.tags?.split(/[;,]/).map(t => t.trim()).includes(selectedTag);
       
       return matchesSearch && matchesTag;
     });
