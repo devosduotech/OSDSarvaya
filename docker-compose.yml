@@ -1,12 +1,18 @@
 services:
   osdsarvaya:
-    build: .
+    build:
+      context: .
+      args:
+        APP_VERSION: v1.0.6
     container_name: osdsarvaya-app
     ports:
       - "3001:3001"
 
     env_file:
       - production.env
+
+    environment:
+      - APP_VERSION=v1.0.6
 
     volumes:
       - ./osdsarvaya_session:/app/server/.wwebjs_auth

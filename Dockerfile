@@ -1,6 +1,11 @@
 FROM node:18-bullseye
 
 # -----------------------------
+# Build Arguments
+# -----------------------------
+ARG APP_VERSION=v1.0.0
+
+# -----------------------------
 # Install Chromium + Dependencies
 # -----------------------------
 RUN apt-get update && apt-get install -y \
@@ -47,6 +52,7 @@ RUN apt-get update && apt-get install -y \
 ENV NODE_ENV=production
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV APP_VERSION=${APP_VERSION}
 
 WORKDIR /app
 
