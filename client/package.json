@@ -49,6 +49,17 @@
       "electron/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "../server/",
+        "to": "server/",
+        "filter": ["**/*", "!node_modules/**"]
+      },
+      {
+        "from": "../production.env",
+        "to": "server/production.env"
+      }
+    ],
     "win": {
       "target": [
         {
@@ -66,6 +77,9 @@
       "createStartMenuShortcut": true,
       "shortcutName": "OSDSarvaya"
     },
-    "asar": true
+    "asar": true,
+    "asarUnpack": [
+      "server/**/*"
+    ]
   }
 }
