@@ -20,19 +20,15 @@ const Dashboard: React.FC = () => {
 
   const [selectedCampaignRunId, setSelectedCampaignRunId] = useState<string>('');
   const [alert, setAlert] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
-  const shownAlertsRef = useRef<Set<string>>(new Set());
+  const lastCampaignRunIdRef = useRef<string>('');
 
-  // Show alert when campaign fails (only once per failed campaign)
+  // Show alert only for campaigns created in the last 30 seconds (toast notification style)
   useEffect(() => {
     const latestRun = campaignRuns[campaignRuns.length - 1];
-    if (latestRun) {
-      // Skip if we already showed alert for this specific run
-      if (shownAlertsRef.current.has(latestRun.id)) {
-        return;
-      }
+    if (latestRun && latestRun.id !== lastCampaignRunIdRef.current) {
+      lastCampaignRunIdRef.current = latestRun.id;
       
       if (latestRun.status === 'Failed') {
-        shownAlertsRef.current.add(latestRun.id);
         const failedActivity = activities.find(a => a.type === 'campaign_failed');
         const reason = failedActivity?.message || 'Campaign failed! Check reports for details.';
         setAlert({ type: 'error', message: reason });
