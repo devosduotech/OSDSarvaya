@@ -625,10 +625,21 @@ async function processRun(runId, templateId, groupIds) {
 
     for (const contact of contacts) {
 
+      // Check if WhatsApp is still connected before each message
+      if (!waClient || !waClient.info) {
+        logger.error('WhatsApp disconnected during campaign');
+        throw new Error('WhatsApp disconnected during campaign');
+      }
+
       try {
 
         const formatted = normalizePhone(contact.phone);
-        const numberId = await waClient.getNumberId(`${formatted}@c.us`);
+        
+        // Add timeout for getNumberId
+        const numberId = await Promise.race([
+          waClient.getNumberId(`${formatted}@c.us`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('getNumberId timeout')), 10000))
+        ]);
 
         if (!numberId) {
           logger.warn(`Not registered: ${formatted}`);
@@ -684,7 +695,7 @@ async function processRun(runId, templateId, groupIds) {
         }
 
       } catch (err) {
-        logger.error({ err }, 'SEND FAILED');
+        logger.error({ err, contact: contact.phone }, 'SEND FAILED');
         failed++;
       }
 
