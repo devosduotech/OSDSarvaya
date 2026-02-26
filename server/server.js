@@ -564,6 +564,7 @@ app.post('/api/campaigns/cancel/:id', verifyToken, async (req, res) => {
 async function processRun(runId, templateId, groupIds) {
 
   logger.info(`PROCESS RUN STARTED -> ${runId}`);
+  logger.info(`Group IDs: ${JSON.stringify(groupIds)}`);
 
   const db = await dbPromise;
   let sent = 0;
@@ -593,18 +594,42 @@ async function processRun(runId, templateId, groupIds) {
       }
     }
 
+    // Ensure groupIds is an array
+    let groupIdsArray = groupIds;
+    if (typeof groupIds === 'string') {
+      try {
+        groupIdsArray = JSON.parse(groupIds);
+      } catch (e) {
+        groupIdsArray = [groupIds];
+      }
+    }
+    
+    if (!Array.isArray(groupIdsArray)) {
+      groupIdsArray = [groupIdsArray];
+    }
+    
+    if (groupIdsArray.length === 0) {
+      throw new Error('No groups selected');
+    }
+
+    logger.info(`Querying contacts for groups: ${JSON.stringify(groupIdsArray)}`);
+
     // JOIN-based contact retrieval (only opted-in contacts)
     const contacts = await db.all(
       `SELECT c.*
        FROM contacts c
        JOIN group_contacts gc
          ON c.id = gc.contact_Id
-       WHERE gc.group_Id IN (${groupIds.map(() => '?').join(',')})
+       WHERE gc.group_Id IN (${groupIdsArray.map(() => '?').join(',')})
        AND (c.optedIn IS NULL OR c.optedIn = 1)`,
-      ...groupIds
+      ...groupIdsArray
     );
 
     logger.info(`Contacts loaded: ${contacts.length}`);
+    
+    if (contacts.length === 0) {
+      throw new Error('No contacts found in selected groups (or all opted out)');
+    }
 
     // Get rate limiting setting
     const settings = await db.all(`SELECT * FROM settings`);
@@ -816,12 +841,16 @@ async function processRun(runId, templateId, groupIds) {
 
   } catch (err) {
 
-    logger.error({ err }, 'PROCESS RUN FAILED');
+    logger.error({ err, runId, templateId, groupIds }, 'PROCESS RUN FAILED');
+    logger.error('Error message:', err.message);
+    logger.error('Error stack:', err.stack);
 
     await db.run(
       `UPDATE campaign_runs SET status='Failed' WHERE id=?`,
       runId
     );
+    
+    emitActivity('campaign_failed', `Campaign failed: ${err.message}`, { runId });
   }
 
   isCampaignRunning = false;
