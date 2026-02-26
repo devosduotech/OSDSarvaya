@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
@@ -20,31 +20,49 @@ const Dashboard: React.FC = () => {
 
   const [selectedCampaignRunId, setSelectedCampaignRunId] = useState<string>('');
   const [alert, setAlert] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
-  const lastCampaignRunIdRef = useRef<string>('');
 
-  // Show alert only for campaigns created in the last 30 seconds (toast notification style)
+  // Show alert only for the last campaign if failed and not yet acknowledged
   useEffect(() => {
     const latestRun = campaignRuns[campaignRuns.length - 1];
-    if (latestRun && latestRun.id !== lastCampaignRunIdRef.current) {
-      lastCampaignRunIdRef.current = latestRun.id;
-      
-      if (latestRun.status === 'Failed') {
-        const failedActivity = activities.find(a => a.type === 'campaign_failed');
-        const reason = failedActivity?.message || 'Campaign failed! Check reports for details.';
-        setAlert({ type: 'error', message: reason });
-      } else if (latestRun.status === 'Sent') {
-        const report = reports.find(r => r.campaignRunId === latestRun.id);
-        if (report && report.failed > 0) {
-          setAlert({ type: 'error', message: `Campaign completed with ${report.failed} failed messages.` });
-        }
+    if (!latestRun) return;
+
+    // Get acknowledged campaigns from localStorage
+    const acknowledged = JSON.parse(localStorage.getItem('acknowledgedCampaigns') || '[]');
+    
+    // Skip if already acknowledged
+    if (acknowledged.includes(latestRun.id)) {
+      return;
+    }
+    
+    if (latestRun.status === 'Failed') {
+      const failedActivity = activities.find(a => a.type === 'campaign_failed');
+      const reason = failedActivity?.message || 'Campaign failed! Check reports for details.';
+      setAlert({ type: 'error', message: reason });
+    } else if (latestRun.status === 'Sent') {
+      const report = reports.find(r => r.campaignRunId === latestRun.id);
+      if (report && report.failed > 0) {
+        setAlert({ type: 'error', message: `Campaign completed with ${report.failed} failed messages.` });
       }
     }
   }, [campaignRuns, reports, activities]);
 
-  // Auto-hide alert after 10 seconds
+  // Mark campaign as acknowledged when alert is closed
+  const handleCloseAlert = () => {
+    const latestRun = campaignRuns[campaignRuns.length - 1];
+    if (latestRun) {
+      const acknowledged = JSON.parse(localStorage.getItem('acknowledgedCampaigns') || '[]');
+      if (!acknowledged.includes(latestRun.id)) {
+        acknowledged.push(latestRun.id);
+        localStorage.setItem('acknowledgedCampaigns', JSON.stringify(acknowledged));
+      }
+    }
+    setAlert(null);
+  };
+
+  // Auto-hide alert after 10 seconds and mark as acknowledged
   useEffect(() => {
     if (alert) {
-      const timer = setTimeout(() => setAlert(null), 10000);
+      const timer = setTimeout(() => handleCloseAlert(), 10000);
       return () => clearTimeout(timer);
     }
   }, [alert]);
@@ -118,7 +136,7 @@ const formatTime = (timestamp: string | number) => {
           }`}>
             <div className="flex justify-between items-center">
               <span>{alert.message}</span>
-              <button onClick={() => setAlert(null)} className="text-lg">&times;</button>
+              <button onClick={handleCloseAlert} className="text-lg">&times;</button>
             </div>
           </div>
         </div>
