@@ -249,7 +249,7 @@ const Campaigns: React.FC = () => {
                   </div>
                 ) : null}
 
-                <p className="text-sm bg-slate-50 p-3 rounded h-24 overflow-y-auto">
+                <p className="text-sm bg-slate-50 dark:bg-slate-700 dark:text-white p-3 rounded h-24 overflow-y-auto whitespace-pre-wrap">
                   {t.message || 'No message'}
                 </p>
               </div>
@@ -301,7 +301,7 @@ const Campaigns: React.FC = () => {
 
             <textarea
               rows={4}
-              className="w-full p-3 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+              className="w-full p-3 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white whitespace-pre-wrap"
               placeholder="Message (use {{name}})"
               value={currentTemplate.message || ''}
               onChange={(e) => setCurrentTemplate({ ...currentTemplate, message: e.target.value })}
