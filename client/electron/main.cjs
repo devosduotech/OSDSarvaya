@@ -13,91 +13,114 @@ log.transports.file.level = 'info';
 log.transports.console.level = 'info';
 
 log.info('OSDSarvaya starting...');
+
+let serverProcess = null;
+let mainWindow = null;
+
+const isDev = process.env.NODE_ENV === 'development';
+const PORT = 3001;
+const SERVER_URL = `http://localhost:${PORT}`;
+
 log.info('App path:', app.getAppPath());
 log.info('Is packaged:', app.isPackaged);
 log.info('User data path:', app.getPath('userData'));
 log.info('Resources path:', process.resourcesPath);
 
-let serverProcess = null;
-let mainWindow = null;
-
-const isDev = !app.isPackaged;
-const PORT = 3001;
-const SERVER_URL = `http://localhost:${PORT}`;
+function getAppRoot() {
+  if (app.isPackaged) {
+    // In packaged app, app.getAppPath() returns the asar path
+    // But files in extraResources are in process.resourcesPath
+    return process.resourcesPath;
+  }
+  return path.join(__dirname, '..');
+}
 
 function getServerPath() {
-  if (app.isPackaged) {
-    // Try multiple locations for server
-    const locations = [
-      path.join(process.resourcesPath, 'server'),
-      path.join(process.resourcesPath, 'app.asar.unpacked', 'server'),
-      path.join(app.getAppPath(), 'server'),
-    ];
-    
-    for (const serverPath of locations) {
-      if (fs.existsSync(serverPath)) {
-        log.info(`Server found at: ${serverPath}`);
-        return serverPath;
-      }
-    }
-    
-    log.error('Server not found in any location');
-    return locations[0];
-  }
-  return path.join(__dirname, '..', 'server');
+  const appRoot = getAppRoot();
+  const serverPath = path.join(appRoot, 'server');
+  log.info('Server path:', serverPath);
+  log.info('Server exists:', fs.existsSync(serverPath));
+  return serverPath;
 }
 
 function startServer() {
-  const serverPath = getServerPath();
-  
-  log.info(`Starting server from: ${serverPath}`);
-  log.info(`Server path exists: ${fs.existsSync(serverPath)}`);
-  
-  let envFile = path.join(serverPath, 'production.env');
-  if (!fs.existsSync(envFile)) {
-    envFile = path.join(process.resourcesPath, 'production.env');
-  }
-  if (!fs.existsSync(envFile) && !app.isPackaged) {
-    envFile = path.join(__dirname, '..', 'production.env');
-  }
-  
-  log.info('Looking for env file at:', envFile);
-  
-  let envArgs = [];
-  
-  if (fs.existsSync(envFile)) {
-    const envContent = fs.readFileSync(envFile, 'utf-8');
-    const envVars = {};
-    envContent.split('\n').forEach(line => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) {
-        envVars[match[1].trim()] = match[2].trim();
-      }
-    });
+  try {
+    const serverPath = getServerPath();
+    log.info('Starting server from:', serverPath);
     
-    Object.assign(process.env, envVars);
-    log.info('Loaded environment from production.env');
-  }
-  
-  serverProcess = spawn('node', ['server.js'], {
-    cwd: serverPath,
-    stdio: 'inherit',
-    env: {
+    if (!fs.existsSync(serverPath)) {
+      log.error('Server directory not found!');
+      return;
+    }
+    
+    const serverFile = path.join(serverPath, 'server.js');
+    if (!fs.existsSync(serverFile)) {
+      log.error('server.js not found at:', serverFile);
+      return;
+    }
+    
+    // Check for production.env
+    let envFile = path.join(serverPath, 'production.env');
+    if (!fs.existsSync(envFile)) {
+      envFile = path.join(process.resourcesPath, 'production.env');
+    }
+    
+    log.info('Using env file:', envFile, 'exists:', fs.existsSync(envFile));
+    
+    const env = {
       ...process.env,
       NODE_ENV: 'production',
-      PORT: PORT
-    },
-    shell: true,
-    windowsHide: true
-  });
-
-  serverProcess.on('error', (err) => {
-    log.error('Server error:', err);
-  });
-
-  serverProcess.on('exit', (code) => {
-    log.info(`Server exited with code: ${code}`);
-  });
+      PORT: PORT.toString()
+    };
+    
+    if (fs.existsSync(envFile)) {
+      try {
+        const envContent = fs.readFileSync(envFile, 'utf-8');
+        envContent.split('\n').forEach(line => {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('#')) {
+            const idx = trimmed.indexOf('=');
+            if (idx > 0) {
+              const key = trimmed.substring(0, idx).trim();
+              const value = trimmed.substring(idx + 1).trim();
+              env[key] = value;
+            }
+          }
+        });
+        log.info('Loaded env file');
+      } catch (e) {
+        log.warn('Could not load env file:', e.message);
+      }
+    }
+    
+    serverProcess = spawn('node', ['server.js'], {
+      cwd: serverPath,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: env,
+      detached: false,
+      windowsHide: true
+    });
+    
+    serverProcess.stdout.on('data', (data) => {
+      log.info('Server:', data.toString().trim());
+    });
+    
+    serverProcess.stderr.on('data', (data) => {
+      log.error('Server error:', data.toString().trim());
+    });
+    
+    serverProcess.on('error', (err) => {
+      log.error('Server spawn error:', err.message);
+    });
+    
+    serverProcess.on('exit', (code) => {
+      log.info('Server exited with code:', code);
+    });
+    
+    log.info('Server process started');
+  } catch (err) {
+    log.error('Error starting server:', err.message);
+  }
 }
 
 function createWindow() {
@@ -155,70 +178,6 @@ function createWindow() {
       log.error('Failed to load file:', e);
     });
   });
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-}
-    if (!fs.existsSync(htmlPath)) {
-      htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
-    }
-  }
-  
-  log.info('Loading HTML from:', htmlPath);
-  log.info('HTML path exists:', fs.existsSync(htmlPath));
-  log.info('App path:', app.getAppPath());
-  log.info('Resources path:', process.resourcesPath);
-  log.info('__dirname:', __dirname);
-  
-  // List files in app directory for debugging
-  try {
-    const appDir = app.getAppPath();
-    log.info('App directory contents:', fs.readdirSync(appDir).slice(0, 10));
-  } catch (e) {
-    log.error('Cannot read app directory:', e.message);
-  }
-  
-  mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 700,
-    title: 'OSDSarvaya',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      webSecurity: true
-    },
-    show: false
-  });
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    log.info('Main window shown via ready-to-show');
-  });
-
-  mainWindow.webContents.on('did-finish-load', () => {
-    log.info('Content loaded successfully');
-    if (!mainWindow.isVisible()) {
-      mainWindow.show();
-    }
-  });
-
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    log.error('Failed to load:', errorCode, errorDescription);
-  });
-
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
-  if (isDev) {
-    mainWindow.loadURL(SERVER_URL);
-  } else {
-    mainWindow.loadFile(htmlPath);
-  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
