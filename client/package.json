@@ -47,7 +47,9 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "package.json"
+      "server/**/*",
+      "package.json",
+      "../production.env"
     ],
     "win": {
       "target": [
