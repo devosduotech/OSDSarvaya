@@ -626,6 +626,7 @@ async function processRun(runId, templateId, groupIds) {
     );
 
     logger.info(`Contacts loaded: ${contacts.length}`);
+    logger.info(`Contact details: ${JSON.stringify(contacts.map(c => ({ phone: c.phone, optedIn: c.optedIn })))}`);
     
     // If no contacts found (all opted out), mark as completed with 0 sent
     if (contacts.length === 0) {
@@ -659,6 +660,7 @@ async function processRun(runId, templateId, groupIds) {
     const delayMs = Math.round(3600000 / messagesPerHour);
 
     logger.info(`Rate limit: ${messagesPerHour} msgs/hour, delay: ${delayMs}ms`);
+    logger.info(`WhatsApp client status: ${waClient ? 'exists' : 'null'}, info: ${waClient?.info?.wid?._serialized || 'no info'}`);
 
     await db.run(
       `UPDATE reports SET totalContacts=? WHERE campaignRunId=?`,
@@ -668,15 +670,18 @@ async function processRun(runId, templateId, groupIds) {
 
     for (const contact of contacts) {
 
+      logger.info(`Processing contact: ${contact.phone}, optedIn: ${contact.optedIn}`);
+
       // Check if WhatsApp is still connected before each message
-      if (!waClient || !waClient.info) {
-        logger.error('WhatsApp disconnected during campaign');
-        throw new Error('WhatsApp disconnected during campaign');
+      if (!waClient) {
+        logger.error('WhatsApp client is null during campaign');
+        throw new Error('WhatsApp client disconnected');
       }
 
       try {
 
         const formatted = normalizePhone(contact.phone);
+        logger.info(`Looking up WhatsApp ID for: ${formatted}`);
         
         // Add timeout for getNumberId
         const numberId = await Promise.race([
@@ -685,10 +690,12 @@ async function processRun(runId, templateId, groupIds) {
         ]);
 
         if (!numberId) {
-          logger.warn(`Not registered: ${formatted}`);
+          logger.warn(`Not registered on WhatsApp: ${formatted}`);
           failed++;
           continue;
         }
+        
+        logger.info(`Found WhatsApp ID: ${numberId._serialized}`);
 
         let message = applyTemplateVariables(template.message, contact);
 
@@ -732,6 +739,7 @@ async function processRun(runId, templateId, groupIds) {
           }
 
         } else {
+          logger.info(`Sending message to ${numberId._serialized}: ${message.substring(0, 50)}...`);
           await waClient.sendMessage(numberId._serialized, message);
           logger.info(`Sent to ${formatted}`);
           sent++;
