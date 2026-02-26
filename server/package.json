@@ -1,6 +1,6 @@
 {
   "name": "campblast-server",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Backend server for CampBlast WhatsApp application.",
   "main": "server.js",
   "scripts": {

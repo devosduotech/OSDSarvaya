@@ -133,6 +133,23 @@ const initializeDb = async () => {
         // Migration: Add maxRetries to settings
         await db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('maxRetries', '3')");
 
+        // Create licenses table for license key management
+        await db.exec(`
+            CREATE TABLE IF NOT EXISTS licenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                license_key TEXT UNIQUE NOT NULL,
+                customer_email TEXT,
+                customer_name TEXT,
+                purchase_date TEXT,
+                activated INTEGER DEFAULT 0,
+                machine_id TEXT,
+                activation_date TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        `);
+
         logger.info('Database schema verified and is up-to-date.');
 
         return db;

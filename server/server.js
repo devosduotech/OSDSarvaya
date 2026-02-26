@@ -14,7 +14,7 @@ const logger = require('./logger');
 const { verifyToken, verifySocketToken } = require('./middleware/auth');
 const dbPromise = require('./database');
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.2';
 const API_VERSION = 'v1';
 
 const app = express();
@@ -169,6 +169,19 @@ app.post('/api/login', (req, res) => {
 
   return res.status(401).json({ success: false });
 });
+
+
+// =====================================================
+// LICENSE ROUTES (Public - for client activation)
+// =====================================================
+const licenseRouter = require('./routes/license');
+app.use('/api/license', licenseRouter);
+
+// =====================================================
+// UPDATE ROUTES (Public - for auto-update)
+// =====================================================
+const updatesRouter = require('./routes/updates');
+app.use('/api/updates', updatesRouter);
 
 
 // =====================================================

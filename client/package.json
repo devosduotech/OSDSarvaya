@@ -2,7 +2,7 @@
 {
   "name": "campblast-client",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "CampBlast - WhatsApp Bulk Messaging Application",
   "author": "OSDuo Tech",
   "type": "module",

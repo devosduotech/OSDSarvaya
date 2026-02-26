@@ -3,15 +3,25 @@ import QRCode from 'qrcode';
 import { useAppContext } from '../context/AppContext';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { UploadIcon } from '../components/icons/Icons';
-
-const CLIENT_VERSION = '1.0.0';
+import { UploadIcon, RefreshIcon, TrashIcon } from '../components/icons/Icons';
+import { APP_VERSION } from '../version';
 
 interface ServerVersion {
   appVersion: string;
   apiVersion: string;
   environment: string;
   timestamp: string;
+}
+
+interface License {
+  license_key: string;
+  customer_email: string;
+  customer_name: string;
+  purchase_date: string;
+  activated: number;
+  activation_date: string;
+  is_active: number;
+  created_at: string;
 }
 
 const Settings: React.FC = () => {
@@ -41,6 +51,14 @@ const Settings: React.FC = () => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [serverVersion, setServerVersion] = useState<ServerVersion | null>(null);
 
+  // License management state
+  const [licenses, setLicenses] = useState<License[]>([]);
+  const [isLoadingLicenses, setIsLoadingLicenses] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [newLicenseEmail, setNewLicenseEmail] = useState('');
+  const [newLicenseName, setNewLicenseName] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
@@ -50,6 +68,90 @@ const Settings: React.FC = () => {
       .then(res => res.json())
       .then(setServerVersion)
       .catch(console.error);
+  }, []);
+
+  // License management functions
+  const fetchLicenses = async () => {
+    const token = localStorage.getItem('token');
+    setIsLoadingLicenses(true);
+    try {
+      const res = await fetch('/api/license/list', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLicenses(data.licenses);
+      }
+    } catch (err) {
+      console.error('Failed to fetch licenses:', err);
+    }
+    setIsLoadingLicenses(false);
+  };
+
+  const generateLicense = async () => {
+    if (!newLicenseEmail) {
+      alert('Please enter customer email');
+      return;
+    }
+    const token = localStorage.getItem('token');
+    setIsGenerating(true);
+    try {
+      const res = await fetch('/api/license/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          customerEmail: newLicenseEmail,
+          customerName: newLicenseName
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`License generated: ${data.licenseKey}\n\nCustomer: ${data.customerEmail}`);
+        setShowGenerateModal(false);
+        setNewLicenseEmail('');
+        setNewLicenseName('');
+        fetchLicenses();
+      } else {
+        alert('Failed to generate license');
+      }
+    } catch (err) {
+      console.error('Failed to generate license:', err);
+      alert('Failed to generate license');
+    }
+    setIsGenerating(false);
+  };
+
+  const revokeLicense = async (key: string) => {
+    if (!confirm(`Are you sure you want to revoke license: ${key}?`)) return;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/api/license/revoke/${key}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('License revoked successfully');
+        fetchLicenses();
+      } else {
+        alert('Failed to revoke license');
+      }
+    } catch (err) {
+      console.error('Failed to revoke license:', err);
+      alert('Failed to revoke license');
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('License key copied to clipboard!');
+  };
+
+  useEffect(() => {
+    fetchLicenses();
   }, []);
 
   useEffect(() => {
@@ -351,7 +453,7 @@ const Settings: React.FC = () => {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
               <span className="text-gray-500 dark:text-gray-400">Client Version</span>
-              <p className="font-semibold dark:text-white">{CLIENT_VERSION}</p>
+              <p className="font-semibold dark:text-white">{APP_VERSION}</p>
             </div>
             <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
               <span className="text-gray-500 dark:text-gray-400">Server Version</span>
@@ -368,6 +470,177 @@ const Settings: React.FC = () => {
           </div>
         </div>
       </Card>
+
+      {/* LICENSE MANAGEMENT */}
+      <Card>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold dark:text-white">License Management</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Generate and manage customer license keys
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="secondary" 
+                icon={<RefreshIcon className="w-4 h-4" />}
+                onClick={fetchLicenses}
+                disabled={isLoadingLicenses}
+              >
+                Refresh
+              </Button>
+              <Button 
+                onClick={() => setShowGenerateModal(true)}
+              >
+                Generate Key
+              </Button>
+            </div>
+          </div>
+
+          {/* LICENSE LIST */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-slate-700">
+                <tr>
+                  <th className="px-4 py-2 text-left dark:text-gray-300">License Key</th>
+                  <th className="px-4 py-2 text-left dark:text-gray-300">Customer</th>
+                  <th className="px-4 py-2 text-left dark:text-gray-300">Status</th>
+                  <th className="px-4 py-2 text-left dark:text-gray-300">Activated</th>
+                  <th className="px-4 py-2 text-left dark:text-gray-300">Created</th>
+                  <th className="px-4 py-2 text-right dark:text-gray-300">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoadingLicenses ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : licenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      No licenses found. Click "Generate Key" to create one.
+                    </td>
+                  </tr>
+                ) : (
+                  licenses.map((license) => (
+                    <tr key={license.license_key} className="border-t dark:border-slate-600">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <code className="font-mono text-xs bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded">
+                            {license.license_key}
+                          </code>
+                          <button
+                            onClick={() => copyToClipboard(license.license_key)}
+                            className="text-blue-500 hover:text-blue-600 text-xs"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 dark:text-gray-300">
+                        <div>{license.customer_name || '-'}</div>
+                        <div className="text-xs text-gray-500">{license.customer_email}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {license.is_active ? (
+                          <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded text-xs">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded text-xs">
+                            Revoked
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 dark:text-gray-300">
+                        {license.activated ? (
+                          <span className="text-green-600">Yes</span>
+                        ) : (
+                          <span className="text-gray-500">No</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {new Date(license.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {license.is_active && (
+                          <button
+                            onClick={() => revokeLicense(license.license_key)}
+                            className="text-red-500 hover:text-red-600 text-xs flex items-center gap-1 ml-auto"
+                          >
+                            <TrashIcon className="w-3 h-3" />
+                            Revoke
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Card>
+
+      {/* GENERATE LICENSE MODAL */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold dark:text-white mb-4">Generate License Key</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium dark:text-gray-300 mb-1">
+                  Customer Email *
+                </label>
+                <input
+                  type="email"
+                  value={newLicenseEmail}
+                  onChange={(e) => setNewLicenseEmail(e.target.value)}
+                  placeholder="customer@example.com"
+                  className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium dark:text-gray-300 mb-1">
+                  Customer Name
+                </label>
+                <input
+                  type="text"
+                  value={newLicenseName}
+                  onChange={(e) => setNewLicenseName(e.target.value)}
+                  placeholder="John Doe"
+                  className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setShowGenerateModal(false);
+                  setNewLicenseEmail('');
+                  setNewLicenseName('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={generateLicense}
+                loading={isGenerating}
+                disabled={!newLicenseEmail}
+              >
+                Generate
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
