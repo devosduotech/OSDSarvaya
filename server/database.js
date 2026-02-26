@@ -4,7 +4,7 @@ const { open } = require('sqlite');
 const path = require('path');
 const logger = require('./logger');
 
-const DB_PATH = path.join(__dirname, 'data', 'campblast.db');
+const DB_PATH = path.join(__dirname, 'data', 'osdsarvaya.db');
 
 // This function will be called once to open the database connection
 const initializeDb = async () => {
