@@ -951,7 +951,18 @@ io.on('connection', (socket) => {
 // =====================================================
 // FRONTEND
 // =====================================================
-const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+// Determine correct path based on environment
+let clientBuildPath;
+if (process.env.NODE_ENV === 'production') {
+  // In packaged app: server is in app.asar.unpacked/server, dist is in app.asar.unpacked/dist
+  clientBuildPath = path.join(__dirname, '..', 'dist');
+} else {
+  // In development/Docker: server is in server/, client is in client/
+  clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+}
+
+logger.info('Serving frontend from:', clientBuildPath);
+
 app.use(express.static(clientBuildPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(clientBuildPath, 'index.html'));
