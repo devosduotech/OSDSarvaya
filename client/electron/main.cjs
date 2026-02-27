@@ -115,7 +115,7 @@ function createWindow() {
     log.error('Load failed:', code, desc);
   });
 
-  mainWindow.setMenuBarVisibility(false);
+  mainWindow.menuBar = false;
 
   // Try server URL first, then file
   mainWindow.loadURL(SERVER_URL).catch(() => {
