@@ -1,9 +1,7 @@
-let version = '1.0.0';
+import packageJson from '../package.json';
+
+const version = packageJson.version || '1.0.6';
 
 export const getVersion = () => version;
-
-export const setVersion = (v: string) => {
-  version = v;
-};
 
 export const APP_VERSION = version;

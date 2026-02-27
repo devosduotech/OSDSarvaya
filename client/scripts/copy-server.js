@@ -47,11 +47,22 @@ function ensureEnvFile() {
   }
 }
 
+function copyClientPackageJson() {
+  const clientPackageJson = path.join(clientDir, 'package.json');
+  const targetPackageJson = path.join(targetDir, 'client-package.json');
+  
+  if (fs.existsSync(clientPackageJson)) {
+    fs.copyFileSync(clientPackageJson, targetPackageJson);
+    console.log('Copied client package.json for versioning');
+  }
+}
+
 console.log('Copying server files to client...');
 
 if (fs.existsSync(serverDir)) {
   copyDir(serverDir, targetDir);
   ensureEnvFile();
+  copyClientPackageJson();
   console.log('Server files copied successfully!');
 } else {
   console.error('Server directory not found!');

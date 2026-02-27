@@ -13,6 +13,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get version from package.json
+        id: version
+        run: |
+          $version = (Get-Content client/package.json | ConvertFrom-Json).version
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -31,7 +38,7 @@ jobs:
       - name: Upload Installer
         uses: actions/upload-artifact@v4
         with:
-          name: OSDSarvayaSetup
+          name: OSDSarvayaSetup-${{ steps.version.outputs.VERSION }}
           path: client/release/OSDSarvayaSetup.exe
 
       - name: Create Release
@@ -39,6 +46,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: client/release/OSDSarvayaSetup.exe
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: OSDSarvaya v${{ steps.version.outputs.VERSION }}
           body: 'OSDSarvaya WhatsApp Bulk Messaging Application'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

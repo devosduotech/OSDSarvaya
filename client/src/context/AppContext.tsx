@@ -18,8 +18,6 @@ import {
 
 import io, { Socket } from 'socket.io-client';
 
-import { setVersion } from '../version';
-
 export type WhatsAppStatus =
   | 'DISCONNECTED'
   | 'CONNECTING'
@@ -177,13 +175,11 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
         setActivities(data.activities);
       }
 
-      // Fetch and set version from server
+      // Fetch version from server (for display only, actual version from package.json)
       try {
         const versionRes = await fetch('/api/version');
         const versionData = await versionRes.json();
-        if (versionData.appVersion) {
-          setVersion(versionData.appVersion);
-        }
+        console.log('Server version:', versionData.appVersion);
       } catch (e) {
         console.error('Failed to fetch version:', e);
       }
