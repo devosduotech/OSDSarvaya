@@ -1,26 +1,107 @@
-
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite');
+const initSqlJs = require('sql.js');
 const path = require('path');
+const fs = require('fs');
 const logger = require('./logger');
 
-const DB_PATH = path.join(__dirname, 'data', 'osdsarvaya.db');
+function getDataPath() {
+    if (process.env.OSDSARVAYA_DATA) {
+        return process.env.OSDSARVAYA_DATA;
+    }
+    if (process.platform === 'win32' && process.env.APPDATA) {
+        return path.join(process.env.APPDATA, 'OSDSarvaya', 'data');
+    }
+    return path.join(__dirname, 'data');
+}
 
-// This function will be called once to open the database connection
+const DB_PATH = path.join(getDataPath(), 'osdsarvaya.db');
+
+let db = null;
+let SQL = null;
+
+function saveDatabase() {
+    if (db) {
+        try {
+            const data = db.export();
+            const buffer = Buffer.from(data);
+            const dir = path.dirname(DB_PATH);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(DB_PATH, buffer);
+        } catch (e) {
+            logger.error({ e }, 'Failed to save database');
+        }
+    }
+}
+
+const dbWrapper = {
+    all: (sql, params = []) => {
+        try {
+            const stmt = db.prepare(sql);
+            if (params.length > 0) stmt.bind(params);
+            const results = [];
+            while (stmt.step()) {
+                results.push(stmt.getAsObject());
+            }
+            stmt.free();
+            return results;
+        } catch (e) {
+            logger.error({ e, sql }, 'DB all error');
+            return [];
+        }
+    },
+    get: (sql, params = []) => {
+        try {
+            const stmt = db.prepare(sql);
+            if (params.length > 0) stmt.bind(params);
+            let result = null;
+            if (stmt.step()) {
+                result = stmt.getAsObject();
+            }
+            stmt.free();
+            return result;
+        } catch (e) {
+            logger.error({ e, sql }, 'DB get error');
+            return null;
+        }
+    },
+    run: (sql, params = []) => {
+        try {
+            db.run(sql, params);
+            saveDatabase();
+            return { changes: db.getRowsModified() };
+        } catch (e) {
+            logger.error({ e, sql, params }, 'DB run error');
+            throw e;
+        }
+    },
+    exec: (sql) => {
+        try {
+            db.exec(sql);
+            saveDatabase();
+        } catch (e) {
+            logger.error({ e, sql }, 'DB exec error');
+            throw e;
+        }
+    }
+};
+
 const initializeDb = async () => {
     try {
-        const db = await open({
-            filename: DB_PATH,
-            driver: sqlite3.Database
-        });
+        SQL = await initSqlJs();
+        
+        if (fs.existsSync(DB_PATH)) {
+            const fileBuffer = fs.readFileSync(DB_PATH);
+            db = new SQL.Database(fileBuffer);
+            logger.info('Database loaded from file.');
+        } else {
+            db = new SQL.Database();
+            logger.info('New database created.');
+        }
 
-        logger.info('Database connection established.');
+        db.run('PRAGMA foreign_keys = ON;');
 
-        // Use PRAGMA for foreign key support
-        await db.exec('PRAGMA foreign_keys = ON;');
-
-        // Define schema and create tables if they don't exist
-        await db.exec(`
+        db.run(`
             CREATE TABLE IF NOT EXISTS contacts (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -30,45 +111,59 @@ const initializeDb = async () => {
                 optedIn INTEGER DEFAULT 1,
                 optedInAt TEXT,
                 optedOutAt TEXT
-            );
+            )
+        `);
 
+        db.run(`
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
                 username TEXT UNIQUE,
                 password TEXT
-            );
+            )
+        `);
 
+        db.run(`
             CREATE TABLE IF NOT EXISTS groups (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL UNIQUE
-            );
+            )
+        `);
 
+        db.run(`
             CREATE TABLE IF NOT EXISTS group_contacts (
                 group_id TEXT NOT NULL,
                 contact_id TEXT NOT NULL,
                 PRIMARY KEY (group_id, contact_id),
                 FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
                 FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
-            );
+            )
+        `);
 
+        db.run(`
             CREATE TABLE IF NOT EXISTS campaign_templates (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 message TEXT,
-                attachment TEXT, -- Stored as JSON string
+                attachment TEXT,
                 createdAt TEXT NOT NULL
-            );
+            )
+        `);
 
+        db.run(`
             CREATE TABLE IF NOT EXISTS campaign_runs (
                 id TEXT PRIMARY KEY,
                 campaignTemplateId TEXT NOT NULL,
-                targetGroupIds TEXT NOT NULL, -- Stored as JSON string
+                targetGroupIds TEXT NOT NULL,
                 status TEXT NOT NULL,
                 scheduledAt TEXT,
                 createdAt TEXT NOT NULL,
+                retryCount INTEGER DEFAULT 0,
+                queuePosition INTEGER,
                 FOREIGN KEY (campaignTemplateId) REFERENCES campaign_templates(id) ON DELETE CASCADE
-            );
+            )
+        `);
 
+        db.run(`
             CREATE TABLE IF NOT EXISTS reports (
                 campaignRunId TEXT PRIMARY KEY,
                 totalContacts INTEGER NOT NULL,
@@ -78,63 +173,27 @@ const initializeDb = async () => {
                 failed INTEGER NOT NULL,
                 progress REAL NOT NULL,
                 FOREIGN KEY (campaignRunId) REFERENCES campaign_runs(id) ON DELETE CASCADE
-            );
+            )
+        `);
 
+        db.run(`
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
-            );
+            )
         `);
 
-        // Initialize default settings if they don't exist
-        await db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('messagesPerHour', '65')");
-
-        // Migration: Add scheduledAt column if not exists
-        try {
-            await db.run("ALTER TABLE campaign_runs ADD COLUMN scheduledAt TEXT");
-        } catch (e) {
-            // Column already exists, ignore
-        }
-
-        // Migration: Add optedIn, optedInAt, optedOutAt to contacts
-        try {
-            await db.run("ALTER TABLE contacts ADD COLUMN optedIn INTEGER DEFAULT 1");
-            await db.run("ALTER TABLE contacts ADD COLUMN optedInAt TEXT");
-            await db.run("ALTER TABLE contacts ADD COLUMN optedOutAt TEXT");
-        } catch (e) {
-            // Columns already exist, ignore
-        }
-
-        // Migration: Add retryCount to campaign_runs
-        try {
-            await db.run("ALTER TABLE campaign_runs ADD COLUMN retryCount INTEGER DEFAULT 0");
-        } catch (e) {
-            // Column already exists, ignore
-        }
-
-        // Migration: Add queuePosition to campaign_runs
-        try {
-            await db.run("ALTER TABLE campaign_runs ADD COLUMN queuePosition INTEGER");
-        } catch (e) {
-            // Column already exists, ignore
-        }
-
-        // Create activities table
-        await db.exec(`
+        db.run(`
             CREATE TABLE IF NOT EXISTS activities (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 type TEXT NOT NULL,
                 message TEXT NOT NULL,
                 metadata TEXT,
                 createdAt TEXT NOT NULL
-            );
+            )
         `);
 
-        // Migration: Add maxRetries to settings
-        await db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('maxRetries', '3')");
-
-        // Create licenses table for license key management
-        await db.exec(`
+        db.run(`
             CREATE TABLE IF NOT EXISTS licenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 license_key TEXT UNIQUE NOT NULL,
@@ -150,9 +209,15 @@ const initializeDb = async () => {
             )
         `);
 
+        db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('messagesPerHour', '65')");
+        db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('maxRetries', '3')");
+
+        saveDatabase();
         logger.info('Database schema verified and is up-to-date.');
 
-        return db;
+        setInterval(saveDatabase, 30000);
+
+        return dbWrapper;
     } catch (err) {
         logger.fatal({ err }, 'Failed to initialize database');
         process.exit(1);

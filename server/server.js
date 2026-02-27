@@ -21,8 +21,19 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3001;
-const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
-const DATA_PATH = path.join(__dirname, 'data');
+
+function getDataPath() {
+    if (process.env.OSDSARVAYA_DATA) {
+        return process.env.OSDSARVAYA_DATA;
+    }
+    if (process.platform === 'win32' && process.env.APPDATA) {
+        return path.join(process.env.APPDATA, 'OSDSarvaya', 'data');
+    }
+    return path.join(__dirname, 'data');
+}
+
+const DATA_PATH = getDataPath();
+const SESSION_PATH = path.join(DATA_PATH, '.wwebjs_auth');
 
 let waClient = null;
 let waStatus = 'DISCONNECTED';
@@ -222,18 +233,23 @@ async function initializeWhatsAppClient() {
 
     logger.info('Initializing WhatsApp Client...');
 
+    const puppeteerOptions = {
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
+    };
+
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+
     waClient = new Client({
       authStrategy: new LocalAuth({ dataPath: SESSION_PATH }),
-      puppeteer: {
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu'
-        ]
-      }
+      puppeteer: puppeteerOptions
     });
 
     waClient.on('qr', (qr) => {
@@ -936,7 +952,7 @@ io.on('connection', (socket) => {
 // =====================================================
 // FRONTEND
 // =====================================================
-const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+const clientBuildPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(clientBuildPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(clientBuildPath, 'index.html'));

@@ -1,5 +1,4 @@
 const { app, BrowserWindow } = require('electron');
-const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const log = require('electron-log');
@@ -16,7 +15,6 @@ log.info('App is packaged:', app.isPackaged);
 log.info('Resources path:', process.resourcesPath);
 
 let mainWindow = null;
-let serverProcess = null;
 const PORT = 3001;
 const SERVER_URL = `http://localhost:${PORT}`;
 
@@ -27,93 +25,58 @@ function getDistPath() {
   return path.join(__dirname, '..', 'dist');
 }
 
-function getServerPath() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'app.asar.unpacked', 'server');
+function getDataPath() {
+  if (process.platform === 'win32' && process.env.APPDATA) {
+    return path.join(process.env.APPDATA, 'OSDSarvaya', 'data');
   }
-  return path.join(__dirname, '..', 'server');
+  if (process.platform === 'darwin' && process.env.HOME) {
+    return path.join(process.env.HOME, 'Library', 'Application Support', 'OSDSarvaya', 'data');
+  }
+  return path.join(process.env.HOME || '', '.osdsarvaya', 'data');
 }
 
-function findNode() {
-  const pathEnv = process.env.PATH || '';
-  const paths = pathEnv.split(path.delimiter);
+async function startServer() {
+  const dataPath = getDataPath();
   
-  for (const p of paths) {
-    const nodePath = path.join(p, 'node.exe');
-    if (fs.existsSync(nodePath)) return nodePath;
-    const nodeCmd = path.join(p, 'node.cmd');
-    if (fs.existsSync(nodeCmd)) return nodeCmd;
+  log.info('Data path:', dataPath);
+  
+  // Ensure data directory exists
+  if (!fs.existsSync(dataPath)) {
+    fs.mkdirSync(dataPath, { recursive: true });
+    log.info('Created data directory:', dataPath);
   }
   
-  const commonPaths = [
-    'C:\\Program Files\\nodejs\\node.exe',
-    'C:\\Program Files (x86)\\nodejs\\node.exe',
-    process.env.LOCALAPPDATA + '\\Programs\\node\\node.exe',
-    process.env.APPDATA + '\\nvm\\current\\node.exe'
-  ];
+  // Set environment
+  process.env.NODE_ENV = 'production';
+  process.env.OSDSARVAYA_DATA = dataPath;
+  process.env.PORT = PORT.toString();
   
-  for (const p of commonPaths) {
-    if (fs.existsSync(p)) return p;
-  }
-  
-  return null;
-}
-
-function startServer() {
-  const serverPath = getServerPath();
-  const serverFile = path.join(serverPath, 'server.js');
-  
-  log.info('Server path:', serverPath);
-  log.info('Server exists:', fs.existsSync(serverFile));
-  
-  if (!fs.existsSync(serverFile)) {
-    log.error('Server not found at:', serverFile);
+  try {
+    // Start the Express server in Electron's process
+    // This uses Electron's bundled Node.js - no external Node needed!
+    const serverPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'server')
+      : path.join(__dirname, '..', 'server');
+    
+    log.info('Loading server from:', serverPath);
+    
+    // Add server node_modules to module search paths
+    const serverNodeModules = path.join(serverPath, 'node_modules');
+    if (fs.existsSync(serverNodeModules)) {
+      module.paths.unshift(serverNodeModules);
+    }
+    
+    // Load and start the server
+    const initializeDb = require(path.join(serverPath, 'database.js'));
+    const serverModule = require(path.join(serverPath, 'server.js'));
+    
+    log.info('Server modules loaded');
+    return true;
+  } catch (err) {
+    log.error('Failed to start server:', err.message);
+    log.error(err.stack);
     return false;
   }
-  
-  const nodePath = findNode();
-  log.info('Node path:', nodePath);
-  
-  if (!nodePath) {
-    log.error('Node.js not found! Please install Node.js from https://nodejs.org');
-    return false;
-  }
-  
-  const serverNodeModules = path.join(serverPath, 'node_modules');
-  const env = { 
-    ...process.env, 
-    NODE_ENV: 'production',
-    NODE_PATH: serverNodeModules
-  };
-  
-  log.info('Using NODE_PATH:', serverNodeModules);
-  
-  serverProcess = spawn(nodePath, ['server.js'], {
-    cwd: serverPath,
-    stdio: 'pipe',
-    env: env,
-    windowsHide: true,
-    shell: false
-  });
-  
-  serverProcess.on('error', (err) => {
-    log.error('Server error:', err.message);
-  });
-  
-  serverProcess.on('exit', (code) => {
-    log.info('Server exited:', code);
-  });
-  
-  serverProcess.stdout.on('data', (data) => {
-    log.info('Server:', data.toString().trim());
-  });
-  
-  serverProcess.stderr.on('data', (data) => {
-    log.error('Server err:', data.toString().trim());
-  });
-  
-  log.info('Server started');
-  return true;
 }
 
 function createWindow() {
@@ -125,6 +88,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: 'OSDSarvaya',
+    icon: path.join(__dirname, '..', 'public', 'icon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -155,15 +119,12 @@ function createWindow() {
   mainWindow.on('closed', () => mainWindow = null);
 }
 
-app.whenReady().then(() => {
-  startServer();
-  setTimeout(() => createWindow(), 5000);
+app.whenReady().then(async () => {
+  await startServer();
+  setTimeout(() => createWindow(), 3000);
 });
 
 app.on('window-all-closed', () => {
-  if (serverProcess) {
-    try { serverProcess.kill(); } catch(e) {}
-  }
   if (process.platform !== 'darwin') app.quit();
 });
 

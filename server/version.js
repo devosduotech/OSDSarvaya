@@ -1,6 +1,6 @@
 const { execSync } = require('child_process');
 
-let version = process.env.APP_VERSION || '1.0.0';
+let version = process.env.APP_VERSION || '1.0.6';
 
 if (!process.env.APP_VERSION) {
   try {
