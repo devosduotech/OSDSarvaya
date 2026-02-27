@@ -49,29 +49,35 @@ function getUnpackedPath(relativePath) {
 }
 
 function startServer() {
-  // First preload dependencies
+  // First preload dependencies from client
   preloadServerDeps();
   
   const serverPath = getUnpackedPath('server');
   const serverFile = path.join(serverPath, 'server.js');
+  const serverNodeModules = path.join(serverPath, 'node_modules');
   
   log.info('Server path:', serverPath);
   log.info('Server file exists:', fs.existsSync(serverFile));
+  log.info('Server node_modules exists:', fs.existsSync(serverNodeModules));
   
   if (!fs.existsSync(serverFile)) {
     log.error('Server file NOT found at:', serverFile);
     return false;
   }
   
-  // Add server node_modules to module paths
-  const serverNodeModules = path.join(serverPath, 'node_modules');
+  // CRITICAL: Add server node_modules to the BEGINNING of module paths
+  // This must be done before requiring anything from the server
   if (fs.existsSync(serverNodeModules)) {
-    module.paths.unshift(serverNodeModules);
-    log.info('Added server node_modules');
+    // Remove any existing paths and add server node_modules first
+    module.paths = [serverNodeModules, ...module.paths];
+    log.info('Added server node_modules to module paths');
+    
+    // Also log what's in the paths
+    log.info('Module paths:', module.paths.slice(0, 3));
   }
 
   try {
-    // Load environment
+    // Load environment FIRST before anything else
     const envPath = path.join(serverPath, 'production.env');
     if (!fs.existsSync(envPath)) {
       const prodEnvPath = path.join(process.resourcesPath, 'production.env');
@@ -84,12 +90,13 @@ function startServer() {
       log.info('Loaded production.env from server folder');
     }
     
-    // Load server
+    // Now load server
     require(serverFile);
     log.info('Server started successfully');
     return true;
   } catch (err) {
     log.error('Failed to start server:', err.message);
+    log.error('Error stack:', err.stack);
     return false;
   }
 }
