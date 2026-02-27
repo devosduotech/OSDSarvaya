@@ -49,7 +49,7 @@ function getUnpackedPath(relativePath) {
 }
 
 function startServer() {
-  // First preload dependencies from client
+  // Preload client dependencies
   preloadServerDeps();
   
   const serverPath = getUnpackedPath('server');
@@ -65,32 +65,34 @@ function startServer() {
     return false;
   }
   
-  // CRITICAL: Add server node_modules to the BEGINNING of module paths
-  // This must be done before requiring anything from the server
+  // CRITICAL: Change working directory to server path BEFORE anything else
+  // This makes relative requires work correctly
+  try {
+    process.chdir(serverPath);
+    log.info('Changed working directory to:', process.cwd());
+  } catch (err) {
+    log.error('Failed to chdir:', err.message);
+  }
+  
+  // Add server node_modules to the front of module paths
   if (fs.existsSync(serverNodeModules)) {
-    // Remove any existing paths and add server node_modules first
     module.paths = [serverNodeModules, ...module.paths];
-    log.info('Added server node_modules to module paths');
-    
-    // Also log what's in the paths
-    log.info('Module paths:', module.paths.slice(0, 3));
+    log.info('Updated module paths');
   }
 
   try {
-    // Load environment FIRST before anything else
+    // Load environment
     const envPath = path.join(serverPath, 'production.env');
     if (!fs.existsSync(envPath)) {
       const prodEnvPath = path.join(process.resourcesPath, 'production.env');
       if (fs.existsSync(prodEnvPath)) {
         require('dotenv').config({ path: prodEnvPath });
-        log.info('Loaded production.env from resources');
       }
     } else {
       require('dotenv').config({ path: envPath });
-      log.info('Loaded production.env from server folder');
     }
     
-    // Now load server
+    // Now require the server
     require(serverFile);
     log.info('Server started successfully');
     return true;
