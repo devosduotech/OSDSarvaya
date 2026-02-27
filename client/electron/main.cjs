@@ -11,49 +11,59 @@ log.transports.file.level = 'info';
 log.transports.console.level = 'info';
 
 log.info('OSDSarvaya starting...');
+log.info('App is packaged:', app.isPackaged);
+log.info('Resources path:', process.resourcesPath);
+log.info('App path:', app.getAppPath());
 
 let mainWindow = null;
 const PORT = 3001;
 const SERVER_URL = `http://localhost:${PORT}`;
 
+function getUnpackedPath(relativePath) {
+  // In packaged app, unpacked files are in app.asar.unpacked
+  // In development, files are directly accessible
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'app.asar.unpacked', relativePath);
+  }
+  return path.join(__dirname, '..', relativePath);
+}
+
 function startServer() {
-  // Get paths
-  const appPath = app.isPackaged 
-    ? path.join(process.resourcesPath, 'app.asar.unpacked')
-    : path.join(__dirname, '..');
+  const serverPath = getUnpackedPath('server');
+  const serverFile = path.join(serverPath, 'server.js');
   
-  const serverPath = path.join(appPath, 'server');
-  const distPath = path.join(appPath, 'dist');
+  log.info('Server path:', serverPath);
+  log.info('Server file exists:', fs.existsSync(serverFile));
   
-  log.info('App path:', appPath);
-  log.info('Server path:', serverPath, 'exists:', fs.existsSync(serverPath));
-  log.info('Dist path:', distPath, 'exists:', fs.existsSync(distPath));
+  if (!fs.existsSync(serverFile)) {
+    log.error('Server file NOT found at:', serverFile);
+    return false;
+  }
   
-  // Add server's node_modules to module paths
+  // Add server node_modules
   const serverNodeModules = path.join(serverPath, 'node_modules');
   if (fs.existsSync(serverNodeModules)) {
     module.paths.unshift(serverNodeModules);
-    log.info('Added server node_modules to path');
-  }
-  
-  // Also add client node_modules for any shared deps
-  const clientNodeModules = path.join(__dirname, '..', 'node_modules');
-  if (fs.existsSync(clientNodeModules)) {
-    module.paths.unshift(clientNodeModules);
+    log.info('Added server node_modules');
   }
 
   try {
-    // Change to server directory and require
-    process.chdir(serverPath);
-    
     // Load environment
     const envPath = path.join(serverPath, 'production.env');
-    if (fs.existsSync(envPath)) {
+    if (!fs.existsSync(envPath)) {
+      // Try resources path for production.env
+      const prodEnvPath = path.join(process.resourcesPath, 'production.env');
+      if (fs.existsSync(prodEnvPath)) {
+        require('dotenv').config({ path: prodEnvPath });
+        log.info('Loaded production.env from resources');
+      }
+    } else {
       require('dotenv').config({ path: envPath });
+      log.info('Loaded production.env from server folder');
     }
     
-    // Load the server
-    require(path.join(serverPath, 'server.js'));
+    // Load server
+    require(serverFile);
     log.info('Server started successfully');
     return true;
   } catch (err) {
@@ -95,7 +105,7 @@ function createWindow() {
   // Try server URL first
   mainWindow.loadURL(SERVER_URL).catch(() => {
     // Fallback to file
-    const htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
+    const htmlPath = getUnpackedPath('dist/index.html');
     log.info('Falling back to:', htmlPath);
     mainWindow.loadFile(htmlPath).catch(e => log.error('Error:', e.message));
   });
@@ -106,10 +116,10 @@ function createWindow() {
 app.whenReady().then(() => {
   startServer();
   
-  // Wait for server to be ready
+  // Wait for server to start
   setTimeout(() => {
     createWindow();
-  }, 5000);
+  }, 3000);
 });
 
 app.on('window-all-closed', () => {
