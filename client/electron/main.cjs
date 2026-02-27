@@ -94,6 +94,18 @@ function startServer() {
   // Prepare environment
   const env = { ...process.env, NODE_ENV: 'production' };
   
+  // Add server node_modules to NODE_PATH so it can find modules
+  const serverNodeModules = path.join(serverPath, 'node_modules');
+  if (fs.existsSync(serverNodeModules)) {
+    env.NODE_PATH = serverNodeModules;
+    log.info('Set NODE_PATH to:', serverNodeModules);
+  }
+  
+  // Also try to preload modules
+  try {
+    require('module')._initPaths();
+  } catch (e) {}
+  
   // Find production.env
   const envPath = path.join(serverPath, 'production.env');
   const prodEnvPath = path.join(process.resourcesPath, 'production.env');
