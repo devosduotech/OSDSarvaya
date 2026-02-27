@@ -52,25 +52,42 @@ async function startServer() {
   process.env.PORT = PORT.toString();
   
   try {
-    // Start the Express server in Electron's process
-    // This uses Electron's bundled Node.js - no external Node needed!
-    const serverPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'server')
-      : path.join(__dirname, '..', 'server');
+    // Determine paths based on whether app is packaged
+    let serverPath;
+    let serverNodeModules;
     
-    log.info('Loading server from:', serverPath);
+    if (app.isPackaged) {
+      // Server files are in app.asar.unpacked
+      serverPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'server');
+      // node_modules is in extraResources
+      serverNodeModules = path.join(process.resourcesPath, 'server', 'node_modules');
+    } else {
+      serverPath = path.join(__dirname, '..', 'server');
+      serverNodeModules = path.join(serverPath, 'node_modules');
+    }
+    
+    log.info('Server path:', serverPath);
+    log.info('Server node_modules:', serverNodeModules);
+    log.info('node_modules exists:', fs.existsSync(serverNodeModules));
     
     // Add server node_modules to module search paths
-    const serverNodeModules = path.join(serverPath, 'node_modules');
     if (fs.existsSync(serverNodeModules)) {
       module.paths.unshift(serverNodeModules);
     }
     
-    // Load and start the server
-    const initializeDb = require(path.join(serverPath, 'database.js'));
-    const serverModule = require(path.join(serverPath, 'server.js'));
+    // Also add to require cache resolution
+    require('module')._initPaths();
     
-    log.info('Server modules loaded');
+    // Load and start the server
+    const serverEntry = path.join(serverPath, 'server.js');
+    log.info('Loading server from:', serverEntry);
+    
+    // Clear require cache to ensure fresh load
+    delete require.cache[require.resolve(serverEntry)];
+    
+    const serverModule = require(serverEntry);
+    
+    log.info('Server modules loaded successfully');
     return true;
   } catch (err) {
     log.error('Failed to start server:', err.message);

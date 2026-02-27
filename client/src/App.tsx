@@ -11,6 +11,8 @@ import Groups from './pages/Groups';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import LicenseInput from './pages/LicenseInput';
+import Help from './pages/Help';
+import FAQ from './pages/FAQ';
 
 import { useAppContext } from './context/AppContext';
 
@@ -96,6 +98,8 @@ const App: React.FC = () => {
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/groups" element={<Groups />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/help" element={<Help />} />
+            <Route path="/faq" element={<FAQ />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

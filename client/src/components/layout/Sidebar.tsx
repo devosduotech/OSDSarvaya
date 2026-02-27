@@ -7,7 +7,9 @@ import {
   CampaignsIcon,
   ContactsIcon,
   GroupsIcon,
-  SettingsIcon
+  SettingsIcon,
+  HelpIcon,
+  QuestionIcon
 } from '../icons/Icons';
 
 const Sidebar: React.FC = () => {
@@ -104,6 +106,26 @@ const Sidebar: React.FC = () => {
         >
           <SettingsIcon className="h-5 w-5 mr-3" />
           Settings
+        </NavLink>
+
+        <NavLink
+          to="/help"
+          className={({ isActive }) =>
+            `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`
+          }
+        >
+          <HelpIcon className="h-5 w-5 mr-3" />
+          Help
+        </NavLink>
+
+        <NavLink
+          to="/faq"
+          className={({ isActive }) =>
+            `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`
+          }
+        >
+          <QuestionIcon className="h-5 w-5 mr-3" />
+          FAQ
         </NavLink>
 
       </nav>
