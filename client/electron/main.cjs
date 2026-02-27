@@ -35,24 +35,16 @@ function getServerPath() {
 }
 
 function findNode() {
-  // Try to find node in PATH
   const pathEnv = process.env.PATH || '';
   const paths = pathEnv.split(path.delimiter);
   
   for (const p of paths) {
     const nodePath = path.join(p, 'node.exe');
-    if (fs.existsSync(nodePath)) {
-      log.info('Found node at:', nodePath);
-      return nodePath;
-    }
+    if (fs.existsSync(nodePath)) return nodePath;
     const nodeCmd = path.join(p, 'node.cmd');
-    if (fs.existsSync(nodeCmd)) {
-      log.info('Found node.cmd at:', nodeCmd);
-      return nodeCmd;
-    }
+    if (fs.existsSync(nodeCmd)) return nodeCmd;
   }
   
-  // Try common installation paths
   const commonPaths = [
     'C:\\Program Files\\nodejs\\node.exe',
     'C:\\Program Files (x86)\\nodejs\\node.exe',
@@ -61,10 +53,7 @@ function findNode() {
   ];
   
   for (const p of commonPaths) {
-    if (fs.existsSync(p)) {
-      log.info('Found node at common path:', p);
-      return p;
-    }
+    if (fs.existsSync(p)) return p;
   }
   
   return null;
@@ -82,7 +71,6 @@ function startServer() {
     return false;
   }
   
-  // Find Node.js
   const nodePath = findNode();
   log.info('Node path:', nodePath);
   
@@ -91,56 +79,15 @@ function startServer() {
     return false;
   }
   
-  // Prepare environment
-  const env = { ...process.env, NODE_ENV: 'production' };
-  
-  // Add server node_modules to NODE_PATH so it can find modules
   const serverNodeModules = path.join(serverPath, 'node_modules');
-  if (fs.existsSync(serverNodeModules)) {
-    env.NODE_PATH = serverNodeModules;
-    log.info('Set NODE_PATH to:', serverNodeModules);
-  }
+  const env = { 
+    ...process.env, 
+    NODE_ENV: 'production',
+    NODE_PATH: serverNodeModules
+  };
   
-  // Also try to preload modules
-  try {
-    require('module')._initPaths();
-  } catch (e) {}
+  log.info('Using NODE_PATH:', serverNodeModules);
   
-  // Find production.env
-  const envPath = path.join(serverPath, 'production.env');
-  const prodEnvPath = path.join(process.resourcesPath, 'production.env');
-  
-  if (fs.existsSync(envPath)) {
-    try {
-      const content = fs.readFileSync(envPath, 'utf-8');
-      content.split('\n').forEach(line => {
-        const t = line.trim();
-        if (t && !t.startsWith('#')) {
-          const i = t.indexOf('=');
-          if (i > 0) env[t.substring(0, i).trim()] = t.substring(i + 1).trim();
-        }
-      });
-      log.info('Loaded env from server folder');
-    } catch (e) {
-      log.warn('Could not load env:', e.message);
-    }
-  } else if (fs.existsSync(prodEnvPath)) {
-    try {
-      const content = fs.readFileSync(prodEnvPath, 'utf-8');
-      content.split('\n').forEach(line => {
-        const t = line.trim();
-        if (t && !t.startsWith('#')) {
-          const i = t.indexOf('=');
-          if (i > 0) env[t.substring(0, i).trim()] = t.substring(i + 1).trim();
-        }
-      });
-      log.info('Loaded env from resources');
-    } catch (e) {
-      log.warn('Could not load env:', e.message);
-    }
-  }
-  
-  // Spawn server
   serverProcess = spawn(nodePath, ['server.js'], {
     cwd: serverPath,
     stdio: 'pipe',
@@ -199,7 +146,6 @@ function createWindow() {
     log.error('Load failed:', code, desc);
   });
 
-  // Try server first
   mainWindow.loadURL(SERVER_URL).catch(() => {
     const htmlPath = path.join(getDistPath(), 'index.html');
     log.info('Fallback to:', htmlPath);
@@ -211,11 +157,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   startServer();
-  
-  // Wait for server
-  setTimeout(() => {
-    createWindow();
-  }, 5000);
+  setTimeout(() => createWindow(), 5000);
 });
 
 app.on('window-all-closed', () => {
