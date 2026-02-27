@@ -70,13 +70,14 @@ async function startServer() {
     log.info('Server node_modules:', serverNodeModules);
     log.info('node_modules exists:', fs.existsSync(serverNodeModules));
     
+    // Set NODE_PATH environment variable so require() can find modules
+    process.env.NODE_PATH = serverNodeModules;
+    require('module')._initPaths();
+    
     // Add server node_modules to module search paths
     if (fs.existsSync(serverNodeModules)) {
       module.paths.unshift(serverNodeModules);
     }
-    
-    // Also add to require cache resolution
-    require('module')._initPaths();
     
     // Load and start the server
     const serverEntry = path.join(serverPath, 'server.js');
