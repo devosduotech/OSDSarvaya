@@ -1,5 +1,4 @@
-const { app, BrowserWindow, shell } = require('electron');
-const { spawn } = require('child_process');
+const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const log = require('electron-log');
@@ -12,77 +11,55 @@ log.transports.file.level = 'info';
 log.transports.console.level = 'info';
 
 log.info('OSDSarvaya starting...');
-log.info('App path:', app.getAppPath());
-log.info('Is packaged:', app.isPackaged);
-log.info('Resources path:', process.resourcesPath);
 
 let mainWindow = null;
-let serverProcess = null;
 const PORT = 3001;
 const SERVER_URL = `http://localhost:${PORT}`;
 
 function startServer() {
-  // Try multiple paths for server
-  const possiblePaths = app.isPackaged ? [
-    path.join(process.resourcesPath, 'app.asar.unpacked', 'server'),
-    path.join(process.resourcesPath, 'server'),
-    path.join(app.getAppPath(), 'server')
-  ] : [
-    path.join(__dirname, '..', 'server')
-  ];
-
-  let serverPath = null;
-  for (const p of possiblePaths) {
-    const serverFile = path.join(p, 'server.js');
-    log.info('Checking:', serverFile, 'exists:', fs.existsSync(serverFile));
-    if (fs.existsSync(serverFile)) {
-      serverPath = p;
-      break;
-    }
+  // Get paths
+  const appPath = app.isPackaged 
+    ? path.join(process.resourcesPath, 'app.asar.unpacked')
+    : path.join(__dirname, '..');
+  
+  const serverPath = path.join(appPath, 'server');
+  const distPath = path.join(appPath, 'dist');
+  
+  log.info('App path:', appPath);
+  log.info('Server path:', serverPath, 'exists:', fs.existsSync(serverPath));
+  log.info('Dist path:', distPath, 'exists:', fs.existsSync(distPath));
+  
+  // Add server's node_modules to module paths
+  const serverNodeModules = path.join(serverPath, 'node_modules');
+  if (fs.existsSync(serverNodeModules)) {
+    module.paths.unshift(serverNodeModules);
+    log.info('Added server node_modules to path');
+  }
+  
+  // Also add client node_modules for any shared deps
+  const clientNodeModules = path.join(__dirname, '..', 'node_modules');
+  if (fs.existsSync(clientNodeModules)) {
+    module.paths.unshift(clientNodeModules);
   }
 
-  if (!serverPath) {
-    log.error('Server not found!');
+  try {
+    // Change to server directory and require
+    process.chdir(serverPath);
+    
+    // Load environment
+    const envPath = path.join(serverPath, 'production.env');
+    if (fs.existsSync(envPath)) {
+      require('dotenv').config({ path: envPath });
+    }
+    
+    // Load the server
+    require(path.join(serverPath, 'server.js'));
+    log.info('Server started successfully');
+    return true;
+  } catch (err) {
+    log.error('Failed to start server:', err.message);
     return false;
   }
-
-  log.info('Starting server from:', serverPath);
-
-  // Set up environment
-  const env = { ...process.env, NODE_ENV: 'production', PORT: PORT.toString() };
-
-  // Try to load env file
-  const envFile = path.join(serverPath, 'production.env');
-  if (fs.existsSync(envFile)) {
-    try {
-      const content = fs.readFileSync(envFile, 'utf-8');
-      content.split('\n').forEach(line => {
-        const t = line.trim();
-        if (t && !t.startsWith('#')) {
-          const i = t.indexOf('=');
-          if (i > 0) env[t.substring(0, i).trim()] = t.substring(i + 1).trim();
-        }
-      });
-      log.info('Loaded env file');
-    } catch (e) {
-      log.warn('Could not load env:', e.message);
-    }
-  }
-
-  // Start server
-  serverProcess = spawn('node', ['server.js'], {
-    cwd: serverPath,
-    stdio: 'ignore',
-    env: env,
-    detached: true,
-    windowsHide: true
-  });
-
-  serverProcess.on('error', (err) => log.error('Server error:', err.message));
-  serverProcess.on('exit', (code) => log.info('Server exit:', code));
-
-  log.info('Server started');
-  return true;
 }
 
 function createWindow() {
@@ -115,10 +92,9 @@ function createWindow() {
     log.error('Load failed:', code, desc);
   });
 
-  mainWindow.menuBar = false;
-
-  // Try server URL first, then file
+  // Try server URL first
   mainWindow.loadURL(SERVER_URL).catch(() => {
+    // Fallback to file
     const htmlPath = path.join(__dirname, '..', 'dist', 'index.html');
     log.info('Falling back to:', htmlPath);
     mainWindow.loadFile(htmlPath).catch(e => log.error('Error:', e.message));
@@ -130,16 +106,13 @@ function createWindow() {
 app.whenReady().then(() => {
   startServer();
   
-  // Wait for server to start
+  // Wait for server to be ready
   setTimeout(() => {
     createWindow();
   }, 5000);
 });
 
 app.on('window-all-closed', () => {
-  if (serverProcess) {
-    try { serverProcess.kill(); } catch(e) {}
-  }
   if (process.platform !== 'darwin') app.quit();
 });
 
