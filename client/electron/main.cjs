@@ -15,13 +15,33 @@ log.info('App is packaged:', app.isPackaged);
 log.info('Resources path:', process.resourcesPath);
 log.info('App path:', app.getAppPath());
 
+// Preload server dependencies to make them available in server process
+const preloadServerDeps = () => {
+  log.info('Preloading server dependencies...');
+  
+  const deps = [
+    'dotenv', 'express', 'http', 'https', 'path', 'fs', 'url',
+    'util', 'crypto', 'events', 'stream', 'buffer', 'querystring',
+    'cors', 'helmet', 'jsonwebtoken', 'socket.io',
+    'puppeteer', 'whatsapp-web.js', 'qrcode'
+  ];
+  
+  deps.forEach(dep => {
+    try {
+      require(dep);
+    } catch (e) {
+      // Silently skip if not found - some may be optional
+    }
+  });
+  
+  log.info('Dependencies preloaded');
+};
+
 let mainWindow = null;
 const PORT = 3001;
 const SERVER_URL = `http://localhost:${PORT}`;
 
 function getUnpackedPath(relativePath) {
-  // In packaged app, unpacked files are in app.asar.unpacked
-  // In development, files are directly accessible
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'app.asar.unpacked', relativePath);
   }
@@ -29,6 +49,9 @@ function getUnpackedPath(relativePath) {
 }
 
 function startServer() {
+  // First preload dependencies
+  preloadServerDeps();
+  
   const serverPath = getUnpackedPath('server');
   const serverFile = path.join(serverPath, 'server.js');
   
@@ -40,7 +63,7 @@ function startServer() {
     return false;
   }
   
-  // Add server node_modules
+  // Add server node_modules to module paths
   const serverNodeModules = path.join(serverPath, 'node_modules');
   if (fs.existsSync(serverNodeModules)) {
     module.paths.unshift(serverNodeModules);
@@ -51,7 +74,6 @@ function startServer() {
     // Load environment
     const envPath = path.join(serverPath, 'production.env');
     if (!fs.existsSync(envPath)) {
-      // Try resources path for production.env
       const prodEnvPath = path.join(process.resourcesPath, 'production.env');
       if (fs.existsSync(prodEnvPath)) {
         require('dotenv').config({ path: prodEnvPath });
@@ -104,7 +126,6 @@ function createWindow() {
 
   // Try server URL first
   mainWindow.loadURL(SERVER_URL).catch(() => {
-    // Fallback to file
     const htmlPath = getUnpackedPath('dist/index.html');
     log.info('Falling back to:', htmlPath);
     mainWindow.loadFile(htmlPath).catch(e => log.error('Error:', e.message));
