@@ -54,6 +54,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "server/**/*",
       "package.json"
     ],
     "extraResources": [
@@ -81,7 +82,8 @@
     },
     "asar": true,
     "asarUnpack": [
-      "dist/**/*"
+      "dist/**/*",
+      "server/**/*"
     ]
   }
 }
