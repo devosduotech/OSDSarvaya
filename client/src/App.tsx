@@ -10,6 +10,7 @@ import Contacts from './pages/Contacts';
 import Groups from './pages/Groups';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import Setup from './pages/Setup';
 import LicenseInput from './pages/LicenseInput';
 import Help from './pages/Help';
 import FAQ from './pages/FAQ';
@@ -19,27 +20,29 @@ import { useAppContext } from './context/AppContext';
 const App: React.FC = () => {
 
   const { isAuthenticated, toast, setToast } = useAppContext();
-  const [isLicenseReady, setIsLicenseReady] = useState(true); // Temporarily disabled
+  const [isLicenseReady, setIsLicenseReady] = useState(true);
   const [isCheckingLicense, setIsCheckingLicense] = useState(false);
+  const [isAdminSetup, setIsAdminSetup] = useState<boolean | null>(null);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+
+  // Check if admin exists on startup
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const res = await fetch('/api/auth/check');
+        const data = await res.json();
+        setIsAdminSetup(data.exists);
+      } catch (err) {
+        console.error('Failed to check admin:', err);
+        setIsAdminSetup(false);
+      } finally {
+        setIsCheckingAdmin(false);
+      }
+    };
+    checkAdmin();
+  }, []);
 
   useEffect(() => {
-    // License check disabled for testing
-    // const checkLicense = async () => {
-    //   const isActivated = licenseService.isLicenseActivated();
-    //   if (isActivated) {
-    //     const validation = await licenseService.validateLicense();
-    //     if (validation.success && validation.valid && validation.activated) {
-    //       setIsLicenseReady(true);
-    //     } else {
-    //       licenseService.clearLicenseInfo();
-    //       setIsLicenseReady(false);
-    //     }
-    //   } else {
-    //     setIsLicenseReady(false);
-    //   }
-    //   setIsCheckingLicense(false);
-    // };
-    // checkLicense();
     setIsCheckingLicense(false);
   }, []);
 
@@ -52,6 +55,25 @@ const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
+
+  if (isCheckingAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAdminSetup) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="/setup" element={<Setup />} />
+          <Route path="*" element={<Navigate to="/setup" replace />} />
+        </Routes>
+      </Router>
+    );
+  }
 
   if (isCheckingLicense) {
     return (

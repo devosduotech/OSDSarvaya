@@ -209,6 +209,26 @@ const initializeDb = async () => {
             )
         `);
 
+        // Admin user table for first-time setup
+        db.run(`
+            CREATE TABLE IF NOT EXISTS admin_user (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                jwt_secret TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        `);
+
+        // App settings table for JWT secret storage
+        db.run(`
+            CREATE TABLE IF NOT EXISTS app_config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        `);
+
         db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('messagesPerHour', '65')");
         db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('maxRetries', '3')");
 
@@ -224,4 +244,46 @@ const initializeDb = async () => {
     }
 };
 
+// Admin user helper functions
+const adminDbWrapper = {
+    checkExists: ()Admin => {
+        const result = dbWrapper.get("SELECT COUNT(*) as count FROM admin_user");
+        return result && result.count > 0;
+    },
+
+    createAdmin: (username, hashedPassword) => {
+        const jwtSecret = require('crypto').randomBytes(64).toString('hex');
+        dbWrapper.run(
+            "INSERT INTO admin_user (username, password, jwt_secret) VALUES (?, ?, ?)",
+            [username, hashedPassword, jwtSecret]
+        );
+        dbWrapper.run(
+            "INSERT OR REPLACE INTO app_config (key, value) VALUES ('jwt_secret', ?)",
+            [jwtSecret]
+        );
+        return jwtSecret;
+    },
+
+    verifyAdmin: (username, password) => {
+        const admin = dbWrapper.get("SELECT * FROM admin_user WHERE username = ?", [username]);
+        if (!admin) return null;
+        
+        const bcrypt = require('bcrypt');
+        const valid = bcrypt.compareSync(password, admin.password);
+        if (!valid) return null;
+        
+        return admin;
+    },
+
+    getJwtSecret: () => {
+        const config = dbWrapper.get("SELECT value FROM app_config WHERE key = 'jwt_secret'");
+        return config ? config.value : null;
+    },
+
+    setJwtSecret: (secret) => {
+        dbWrapper.run("INSERT OR REPLACE INTO app_config (key, value) VALUES ('jwt_secret', ?)", [secret]);
+    }
+};
+
 module.exports = initializeDb();
+module.exports.adminDb = adminDbWrapper;

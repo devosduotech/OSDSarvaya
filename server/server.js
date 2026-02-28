@@ -14,6 +14,15 @@ const logger = require('./logger');
 const { verifyToken, verifySocketToken } = require('./middleware/auth');
 const dbPromise = require('./database');
 
+// Load production.env explicitly if it exists (for packaged app)
+const productionEnvPath = path.join(__dirname, 'production.env');
+if (fs.existsSync(productionEnvPath)) {
+  require('dotenv').config({ path: productionEnvPath });
+  logger.info('Loaded production.env from:', productionEnvPath);
+  logger.info('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
+  logger.info('ADMIN_PASSWORD set:', !!process.env.ADMIN_PASSWORD);
+}
+
 const { APP_VERSION } = require('./version');
 const API_VERSION = 'v1';
 
@@ -188,6 +197,12 @@ app.post('/api/login', (req, res) => {
   return res.status(401).json({ success: false });
 });
 
+
+// =====================================================
+// AUTH ROUTES (Public - for setup wizard and login)
+// =====================================================
+const authRouter = require('./routes/auth');
+app.use('/api/auth', authRouter);
 
 // =====================================================
 // LICENSE ROUTES (Public - for client activation)
