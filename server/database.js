@@ -246,7 +246,7 @@ const initializeDb = async () => {
 
 // Admin user helper functions
 const adminDbWrapper = {
-    checkExists: ()Admin => {
+    checkExists: () => {
         const result = dbWrapper.get("SELECT COUNT(*) as count FROM admin_user");
         return result && result.count > 0;
     },
