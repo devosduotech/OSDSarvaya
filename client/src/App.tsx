@@ -16,12 +16,13 @@ import Help from './pages/Help';
 import FAQ from './pages/FAQ';
 
 import { useAppContext } from './context/AppContext';
+import { licenseService } from './services/license';
 
 const App: React.FC = () => {
 
   const { isAuthenticated, toast, setToast } = useAppContext();
-  const [isLicenseReady, setIsLicenseReady] = useState(true);
-  const [isCheckingLicense, setIsCheckingLicense] = useState(false);
+  const [isLicenseReady, setIsLicenseReady] = useState<boolean | null>(null);
+  const [isCheckingLicense, setIsCheckingLicense] = useState(true);
   const [isAdminSetup, setIsAdminSetup] = useState<boolean | null>(null);
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
 
@@ -42,9 +43,24 @@ const App: React.FC = () => {
     checkAdmin();
   }, []);
 
+  // Check license status after admin setup
   useEffect(() => {
-    setIsCheckingLicense(false);
-  }, []);
+    if (!isAdminSetup || isCheckingAdmin) return;
+
+    const checkLicense = async () => {
+      try {
+        const status = await licenseService.checkLicenseStatus();
+        setIsLicenseReady(status.activated);
+      } catch (err) {
+        console.error('Failed to check license:', err);
+        const localInfo = licenseService.getLicenseInfo();
+        setIsLicenseReady(localInfo?.activated || false);
+      } finally {
+        setIsCheckingLicense(false);
+      }
+    };
+    checkLicense();
+  }, [isAdminSetup, isCheckingAdmin]);
 
   const handleLicenseActivated = () => {
     setIsLicenseReady(true);
@@ -56,7 +72,7 @@ const App: React.FC = () => {
     document.documentElement.classList.add('dark');
   }, []);
 
-  if (isCheckingAdmin) {
+  if (isCheckingAdmin || isCheckingLicense) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-white">Loading...</div>
@@ -75,15 +91,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (isCheckingLicense) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!isLicenseReady) {
+  if (isLicenseReady === false) {
     return (
       <>
         <LicenseInput onActivated={handleLicenseActivated} />

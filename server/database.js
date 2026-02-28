@@ -209,6 +209,20 @@ const initializeDb = async () => {
             )
         `);
 
+        db.run(`
+            CREATE TABLE IF NOT EXISTS license_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                license_key TEXT UNIQUE NOT NULL,
+                is_valid INTEGER DEFAULT 0,
+                message TEXT,
+                customer_email TEXT,
+                customer_name TEXT,
+                validated_at TEXT,
+                expires_at TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        `);
+
         // Admin user table for first-time setup
         db.run(`
             CREATE TABLE IF NOT EXISTS admin_user (

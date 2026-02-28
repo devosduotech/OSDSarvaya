@@ -10,6 +10,7 @@ interface LicenseInputProps {
 
 const LicenseInput: React.FC<LicenseInputProps> = ({ onActivated }) => {
   const [licenseKey, setLicenseKey] = useState('');
+  const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -35,8 +36,13 @@ const LicenseInput: React.FC<LicenseInputProps> = ({ onActivated }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!licenseKey || licenseKey.length !== 24) {
+    if (!licenseKey || licenseKey.length !== 19) {
       setError('Please enter a valid license key');
+      return;
+    }
+
+    if (!email || !email.includes('@')) {
+      setError('Please enter a valid email address');
       return;
     }
 
@@ -45,7 +51,7 @@ const LicenseInput: React.FC<LicenseInputProps> = ({ onActivated }) => {
     setSuccess('');
 
     try {
-      const result = await licenseService.activateLicense(licenseKey);
+      const result = await licenseService.activateLicense(licenseKey, email);
       
       if (result.success) {
         setSuccess(`License activated! Welcome${result.customerName ? `, ${result.customerName}` : ''}!`);
@@ -99,13 +105,33 @@ const LicenseInput: React.FC<LicenseInputProps> = ({ onActivated }) => {
                 type="text"
                 value={licenseKey}
                 onChange={handleChange}
-                placeholder="CAMP-XXXX-XXXX-XXXX-XXXX"
+                placeholder="OSDS-XXXX-XXXX-XXXX-XXXX"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-slate-700 dark:text-white text-center text-lg tracking-widest font-mono"
                 maxLength={19}
                 disabled={isLoading}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Format: CAMP-XXXX-XXXX-XXXX-XXXX
+                Format: OSDS-XXXX-XXXX-XXXX-XXXX
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError('');
+                }}
+                placeholder="your@email.com"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-slate-700 dark:text-white text-center"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Enter the email associated with your license
               </p>
             </div>
 
@@ -125,7 +151,7 @@ const LicenseInput: React.FC<LicenseInputProps> = ({ onActivated }) => {
               type="submit"
               className="w-full"
               loading={isLoading}
-              disabled={isLoading || licenseKey.length !== 19}
+              disabled={isLoading || licenseKey.length !== 19 || !email}
             >
               {isLoading ? 'Activating...' : 'Activate License'}
             </Button>

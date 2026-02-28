@@ -4,7 +4,6 @@ const API_BASE = '';
 
 interface LicenseInfo {
   licenseKey: string;
-  machineId: string;
   customerEmail?: string;
   customerName?: string;
   activated: boolean;
@@ -19,6 +18,8 @@ interface LicenseValidationResponse {
   customerName?: string;
   activationDate?: string;
   message?: string;
+  cached?: boolean;
+  gracePeriod?: boolean;
 }
 
 interface UpdateInfo {
@@ -33,24 +34,6 @@ interface UpdateInfo {
     releaseDate: string;
     mandatory: boolean;
   };
-}
-
-function getMachineId(): string {
-  const key = 'osdsarvaya_machine_id';
-  
-  let machineId = localStorage.getItem(key);
-  
-  if (!machineId) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 32; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    machineId = result.toUpperCase();
-    localStorage.setItem(key, machineId);
-  }
-  
-  return machineId;
 }
 
 function getLicenseInfo(): LicenseInfo | null {
@@ -74,9 +57,7 @@ function clearLicenseInfo(): void {
   localStorage.removeItem('osdsarvaya_license');
 }
 
-async function activateLicense(licenseKey: string): Promise<{ licenseKey: string; success: boolean; message: string; customerEmail?: string; customerName?: string }> {
-  const machineId = getMachineId();
-  
+async function activateLicense(licenseKey: string, email: string): Promise<{ licenseKey: string; success: boolean; message: string; customerEmail?: string; customerName?: string }> {
   try {
     const response = await fetch(`${API_BASE}/api/license/activate`, {
       method: 'POST',
@@ -85,7 +66,7 @@ async function activateLicense(licenseKey: string): Promise<{ licenseKey: string
       },
       body: JSON.stringify({
         licenseKey: licenseKey.trim().toUpperCase(),
-        machineId
+        email: email.trim().toLowerCase()
       })
     });
     
@@ -94,7 +75,6 @@ async function activateLicense(licenseKey: string): Promise<{ licenseKey: string
     if (data.success) {
       const licenseInfo: LicenseInfo = {
         licenseKey: licenseKey.trim().toUpperCase(),
-        machineId,
         customerEmail: data.customerEmail,
         customerName: data.customerName,
         activated: true,
@@ -134,8 +114,7 @@ async function validateLicense(): Promise<LicenseValidationResponse> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        licenseKey: licenseInfo.licenseKey,
-        machineId: licenseInfo.machineId
+        licenseKey: licenseInfo.licenseKey
       })
     });
     
@@ -145,6 +124,45 @@ async function validateLicense(): Promise<LicenseValidationResponse> {
   } catch (err) {
     console.error('License validation error:', err);
     return { success: false, valid: false, message: 'Failed to validate license' };
+  }
+}
+
+async function checkLicenseStatus(): Promise<{ activated: boolean; licenseKey?: string; customerEmail?: string; customerName?: string }> {
+  try {
+    const response = await fetch(`${API_BASE}/api/license/check`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data.activated) {
+      const licenseInfo: LicenseInfo = {
+        licenseKey: data.licenseKey,
+        customerEmail: data.customerEmail,
+        customerName: data.customerName,
+        activated: true,
+        activationDate: data.activationDate
+      };
+      saveLicenseInfo(licenseInfo);
+    }
+    
+    return {
+      activated: data.activated,
+      licenseKey: data.licenseKey,
+      customerEmail: data.customerEmail,
+      customerName: data.customerName
+    };
+  } catch (err) {
+    console.error('License status check error:', err);
+    const localInfo = getLicenseInfo();
+    return {
+      activated: localInfo?.activated || false,
+      licenseKey: localInfo?.licenseKey,
+      customerEmail: localInfo?.customerEmail
+    };
   }
 }
 
@@ -187,10 +205,10 @@ function getLicenseKey(): string | null {
 }
 
 export const licenseService = {
-  getMachineId,
   getLicenseInfo,
   activateLicense,
   validateLicense,
+  checkLicenseStatus,
   checkForUpdates,
   downloadUpdate,
   isLicenseActivated,

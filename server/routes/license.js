@@ -3,107 +3,138 @@ const crypto = require('crypto');
 const router = express.Router();
 const dbPromise = require('../database');
 const logger = require('../logger');
+const { getMachineId } = require('../utils/machineId');
 
-function generateLicenseKey() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const segments = 4;
-    const segmentLength = 4;
-    const parts = [];
+const ERPNEXT_URL = process.env.ERPNEXT_URL || 'https://dvarika.osduotech.com';
+const ERPNEXT_API_KEY = process.env.ERPNEXT_API_KEY;
+const ERPNEXT_API_SECRET = process.env.ERPNEXT_API_SECRET;
+const GRACE_PERIOD_HOURS = 24;
+
+async function callERPNext(method, data) {
+    if (!ERPNEXT_API_KEY || !ERPNEXT_API_SECRET) {
+        logger.error('ERPNext API credentials not configured');
+        throw new Error('ERPNext API credentials not configured');
+    }
+
+    const url = `${ERPNEXT_URL}/api/method/osdsarvaya_app.api.${method}`;
     
-    for (let s = 0; s < segments; s++) {
-        let segment = '';
-        for (let i = 0; i < segmentLength; i++) {
-            segment += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        parts.push(segment);
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `token ${ERPNEXT_API_KEY}:${ERPNEXT_API_SECRET}`
+        },
+        body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+    
+    if (result.message) {
+        return result.message;
     }
     
-    return `CAMP-${parts.join('-')}`;
+    return result;
 }
 
-router.post('/generate', async (req, res) => {
-    try {
-        const { customerEmail, customerName, purchaseDate } = req.body;
-        
-        if (!customerEmail) {
-            return res.status(400).json({ success: false, message: 'Customer email is required' });
-        }
+async function getCachedValidation(licenseKey) {
+    const db = await dbPromise;
+    const cached = await db.get(
+        'SELECT * FROM license_cache WHERE license_key = ?',
+        licenseKey
+    );
+    return cached;
+}
 
-        const licenseKey = generateLicenseKey();
-        const db = await dbPromise;
-        
-        await db.run(
-            `INSERT INTO licenses (license_key, customer_email, customer_name, purchase_date, activated, is_active) 
-             VALUES (?, ?, ?, ?, 0, 1)`,
-            licenseKey,
-            customerEmail,
-            customerName || '',
-            purchaseDate || new Date().toISOString()
-        );
+async function setCachedValidation(licenseKey, isValid, message, customerData) {
+    const db = await dbPromise;
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + GRACE_PERIOD_HOURS);
 
-        logger.info({ licenseKey, customerEmail }, 'License key generated');
-
-        res.json({ 
-            success: true, 
-            licenseKey,
-            customerEmail,
-            customerName,
-            purchaseDate
-        });
-    } catch (err) {
-        logger.error({ err }, 'Failed to generate license key');
-        res.status(500).json({ success: false, message: 'Failed to generate license key' });
-    }
-});
+    await db.run(
+        `INSERT OR REPLACE INTO license_cache (license_key, is_valid, message, customer_email, customer_name, validated_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        licenseKey,
+        isValid ? 1 : 0,
+        message,
+        customerData?.customer_email || null,
+        customerData?.customer || null,
+        new Date().toISOString(),
+        expiresAt.toISOString()
+    );
+}
 
 router.post('/activate', async (req, res) => {
     try {
-        const { licenseKey, machineId } = req.body;
+        const { licenseKey, email } = req.body;
+        const machineId = getMachineId();
 
-        if (!licenseKey || !machineId) {
-            return res.status(400).json({ success: false, message: 'License key and machine ID are required' });
+        if (!licenseKey || !email) {
+            return res.status(400).json({ success: false, message: 'License key and email are required' });
         }
 
-        const db = await dbPromise;
-        
-        const license = await db.get(
-            'SELECT * FROM licenses WHERE license_key = ? AND is_active = 1',
-            licenseKey
-        );
+        logger.info({ licenseKey, email, machineId }, 'Attempting license activation');
 
-        if (!license) {
-            logger.warn({ licenseKey }, 'Invalid license key activation attempt');
-            return res.status(404).json({ success: false, message: 'Invalid license key' });
-        }
-
-        if (license.activated && license.machine_id !== machineId) {
-            logger.warn({ licenseKey, machineId }, 'License already activated on different machine');
-            return res.status(403).json({ 
+        let erpnextResult;
+        try {
+            erpnextResult = await callERPNext('activate_license', {
+                license_key: licenseKey,
+                machine_id: machineId,
+                email: email
+            });
+        } catch (err) {
+            logger.error({ err }, 'ERPNext activation failed, checking cache');
+            const cached = await getCachedValidation(licenseKey);
+            if (cached && new Date(cached.expires_at) > new Date()) {
+                return res.json({
+                    success: true,
+                    message: 'License activated (cached)',
+                    licenseKey: licenseKey,
+                    customerEmail: cached.customer_email,
+                    customerName: cached.customer_name,
+                    cached: true
+                });
+            }
+            return res.status(503).json({ 
                 success: false, 
-                message: 'License already activated on another computer. Please contact support.' 
+                message: 'Unable to connect to license server. Please check your internet connection.' 
             });
         }
 
-        const activationDate = new Date().toISOString();
-        
-        if (!license.activated) {
-            await db.run(
-                `UPDATE licenses SET activated = 1, machine_id = ?, activation_date = ?, updated_at = ? 
-                 WHERE license_key = ?`,
-                machineId,
-                activationDate,
-                activationDate,
-                licenseKey
-            );
-            
-            logger.info({ licenseKey, machineId }, 'License activated successfully');
+        if (!erpnextResult.success) {
+            logger.warn({ licenseKey, erpnextResult }, 'License activation failed from ERPNext');
+            return res.json({
+                success: false,
+                message: erpnextResult.message || 'Activation failed'
+            });
         }
 
-        res.json({ 
-            success: true, 
+        const db = await dbPromise;
+        const activationDate = new Date().toISOString();
+        
+        await db.run(
+            `INSERT OR REPLACE INTO licenses (license_key, customer_email, customer_name, machine_id, activated, is_active, activation_date, updated_at)
+             VALUES (?, ?, ?, ?, 1, 1, ?, ?)`,
+            licenseKey,
+            email,
+            erpnextResult.customer || '',
+            machineId,
+            activationDate,
+            activationDate
+        );
+
+        await setCachedValidation(licenseKey, true, 'License activated', {
+            customer_email: email,
+            customer: erpnextResult.customer
+        });
+
+        logger.info({ licenseKey, machineId, email }, 'License activated successfully');
+
+        res.json({
+            success: true,
             message: 'License activated successfully',
-            customerEmail: license.customer_email,
-            customerName: license.customer_name
+            licenseKey: licenseKey,
+            customerEmail: erpnextResult.customer_email,
+            customerName: erpnextResult.customer
         });
     } catch (err) {
         logger.error({ err }, 'Failed to activate license');
@@ -113,55 +144,129 @@ router.post('/activate', async (req, res) => {
 
 router.post('/validate', async (req, res) => {
     try {
-        const { licenseKey, machineId } = req.body;
+        const { licenseKey } = req.body;
+        const machineId = getMachineId();
 
-        if (!licenseKey || !machineId) {
-            return res.status(400).json({ success: false, message: 'License key and machine ID are required' });
+        if (!licenseKey) {
+            return res.status(400).json({ success: false, message: 'License key is required' });
+        }
+
+        let erpnextResult;
+        try {
+            erpnextResult = await callERPNext('validate_license', {
+                license_key: licenseKey,
+                machine_id: machineId
+            });
+        } catch (err) {
+            logger.error({ err }, 'ERPNext validation failed, checking cache');
+            const cached = await getCachedValidation(licenseKey);
+            if (cached && new Date(cached.expires_at) > new Date()) {
+                return res.json({
+                    success: true,
+                    valid: cached.is_valid === 1,
+                    activated: cached.is_valid === 1,
+                    customerEmail: cached.customer_email,
+                    customerName: cached.customer_name,
+                    activationDate: cached.validated_at,
+                    message: cached.message,
+                    cached: true,
+                    gracePeriod: true
+                });
+            }
+            return res.status(503).json({
+                success: false,
+                valid: false,
+                message: 'Unable to connect to license server and no valid cache available'
+            });
+        }
+
+        if (!erpnextResult.valid) {
+            return res.json({
+                success: false,
+                valid: false,
+                message: erpnextResult.message || 'License validation failed'
+            });
         }
 
         const db = await dbPromise;
-        
-        const license = await db.get(
-            'SELECT * FROM licenses WHERE license_key = ? AND is_active = 1',
-            licenseKey
+        await db.run(
+            `INSERT OR REPLACE INTO licenses (license_key, customer_email, customer_name, machine_id, activated, is_active, activation_date, updated_at)
+             VALUES (?, ?, ?, ?, 1, 1, ?, ?)`,
+            licenseKey,
+            erpnextResult.customer_email || '',
+            erpnextResult.customer || '',
+            machineId,
+            erpnextResult.activation_date || new Date().toISOString(),
+            new Date().toISOString()
         );
 
-        if (!license) {
-            return res.status(404).json({ 
-                success: false, 
-                valid: false,
-                message: 'Invalid license key' 
-            });
-        }
+        await setCachedValidation(licenseKey, true, 'License valid', {
+            customer_email: erpnextResult.customer_email,
+            customer: erpnextResult.customer
+        });
 
-        if (!license.activated) {
-            return res.json({ 
-                success: true, 
-                valid: true,
-                activated: false,
-                message: 'License not yet activated' 
-            });
-        }
-
-        if (license.machine_id !== machineId) {
-            return res.status(403).json({ 
-                success: false, 
-                valid: false,
-                message: 'License activated on different computer' 
-            });
-        }
-
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             valid: true,
             activated: true,
-            customerEmail: license.customer_email,
-            customerName: license.customer_name,
-            activationDate: license.activation_date
+            customerEmail: erpnextResult.customer_email,
+            customerName: erpnextResult.customer,
+            activationDate: erpnextResult.activation_date
         });
     } catch (err) {
         logger.error({ err }, 'Failed to validate license');
         res.status(500).json({ success: false, message: 'Failed to validate license' });
+    }
+});
+
+router.post('/deactivate', async (req, res) => {
+    try {
+        const { licenseKey } = req.body;
+
+        if (!licenseKey) {
+            return res.status(400).json({ success: false, message: 'License key is required' });
+        }
+
+        let erpnextResult;
+        try {
+            erpnextResult = await callERPNext('deactivate_license', {
+                license_key: licenseKey
+            });
+        } catch (err) {
+            return res.status(503).json({
+                success: false,
+                message: 'Unable to connect to license server'
+            });
+        }
+
+        if (!erpnextResult.success) {
+            return res.json({
+                success: false,
+                message: erpnextResult.message || 'Deactivation failed'
+            });
+        }
+
+        const db = await dbPromise;
+        await db.run(
+            'UPDATE licenses SET machine_id = NULL, activated = 0, activation_date = NULL, updated_at = ? WHERE license_key = ?',
+            new Date().toISOString(),
+            licenseKey
+        );
+
+        await db.run(
+            'DELETE FROM license_cache WHERE license_key = ?',
+            licenseKey
+        );
+
+        logger.info({ licenseKey }, 'License deactivated successfully');
+
+        res.json({
+            success: true,
+            message: 'License deactivated successfully'
+        });
+    } catch (err) {
+        logger.error({ err }, 'Failed to deactivate license');
+        res.status(500).json({ success: false, message: 'Failed to deactivate license' });
     }
 });
 
@@ -171,7 +276,7 @@ router.get('/status/:key', async (req, res) => {
         const db = await dbPromise;
         
         const license = await db.get(
-            'SELECT license_key, customer_email, customer_name, purchase_date, activated, activation_date, is_active, created_at FROM licenses WHERE license_key = ?',
+            'SELECT license_key, customer_email, customer_name, machine_id, activated, activation_date, is_active, created_at FROM licenses WHERE license_key = ?',
             key
         );
 
@@ -186,72 +291,39 @@ router.get('/status/:key', async (req, res) => {
     }
 });
 
-router.get('/list', async (req, res) => {
+router.get('/check', async (req, res) => {
     try {
         const db = await dbPromise;
         
-        const licenses = await db.all(
-            'SELECT license_key, customer_email, customer_name, purchase_date, activated, activation_date, is_active, created_at FROM licenses ORDER BY created_at DESC'
+        const license = await db.get(
+            'SELECT license_key, customer_email, customer_name, machine_id, activated, activation_date, is_active FROM licenses WHERE activated = 1 ORDER BY activation_date DESC LIMIT 1'
         );
 
-        res.json({ success: true, licenses });
-    } catch (err) {
-        logger.error({ err }, 'Failed to list licenses');
-        res.status(500).json({ success: false, message: 'Failed to list licenses' });
-    }
-});
-
-router.put('/revoke/:key', async (req, res) => {
-    try {
-        const { key } = req.params;
-        const db = await dbPromise;
-        
-        const result = await db.run(
-            'UPDATE licenses SET is_active = 0, updated_at = ? WHERE license_key = ?',
-            new Date().toISOString(),
-            key
-        );
-
-        if (result.changes === 0) {
-            return res.status(404).json({ success: false, message: 'License not found' });
-        }
-
-        logger.info({ key }, 'License revoked');
-
-        res.json({ success: true, message: 'License revoked successfully' });
-    } catch (err) {
-        logger.error({ err }, 'Failed to revoke license');
-        res.status(500).json({ success: false, message: 'Failed to revoke license' });
-    }
-});
-
-router.put('/reactivate/:key', async (req, res) => {
-    try {
-        const { key } = req.params;
-        const { newMachineId } = req.body;
-        const db = await dbPromise;
-        
-        const license = await db.get('SELECT * FROM licenses WHERE license_key = ?', key);
-        
         if (!license) {
-            return res.status(404).json({ success: false, message: 'License not found' });
+            return res.json({ 
+                success: true, 
+                activated: false,
+                message: 'No active license found'
+            });
         }
 
-        await db.run(
-            'UPDATE licenses SET machine_id = ?, activated = 1, activation_date = ?, updated_at = ? WHERE license_key = ?',
-            newMachineId || null,
-            new Date().toISOString(),
-            new Date().toISOString(),
-            key
-        );
-
-        logger.info({ key }, 'License reactivated');
-
-        res.json({ success: true, message: 'License reactivated successfully' });
+        res.json({
+            success: true,
+            activated: true,
+            licenseKey: license.license_key,
+            customerEmail: license.customer_email,
+            customerName: license.customer_name,
+            activationDate: license.activation_date
+        });
     } catch (err) {
-        logger.error({ err }, 'Failed to reactivate license');
-        res.status(500).json({ success: false, message: 'Failed to reactivate license' });
+        logger.error({ err }, 'Failed to check license status');
+        res.status(500).json({ success: false, message: 'Failed to check license status' });
     }
+});
+
+router.get('/machine-id', (req, res) => {
+    const machineId = getMachineId();
+    res.json({ success: true, machineId });
 });
 
 module.exports = router;
