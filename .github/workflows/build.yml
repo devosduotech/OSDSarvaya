@@ -38,7 +38,7 @@ jobs:
       - name: Upload Installer
         uses: actions/upload-artifact@v4
         with:
-          name: OSDSarvayaSetup-${{ steps.version.outputs.VERSION }}
+          name: OSDSarvayaSetup
           path: client/release/OSDSarvayaSetup.exe
 
       - name: Create Release
