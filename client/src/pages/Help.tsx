@@ -5,6 +5,36 @@ const Help: React.FC = () => {
 
   const sections = [
     {
+      title: 'First Time Setup',
+      content: `
+        <p class="mb-4">On first launch, you'll need to create an admin account:</p>
+        <ol class="list-decimal list-inside space-y-2 ml-2">
+          <li>Enter a <strong>username</strong> (minimum 3 characters)</li>
+          <li>Enter a <strong>password</strong> that meets these requirements:</li>
+          <ul class="list-disc list-inside ml-4 space-y-1">
+            <li>At least 8 characters long</li>
+            <li>At least 1 uppercase letter (A-Z)</li>
+            <li>At least 1 numeric digit (0-9)</li>
+          </ul>
+          <li>Confirm your password</li>
+          <li>Click <strong>Create Admin Account</strong></li>
+        </ol>
+        <p class="mt-4 text-yellow-400">Important: Remember your credentials! There is no password recovery.</p>
+      `
+    },
+    {
+      title: 'Login',
+      content: `
+        <p class="mb-4">After setup, use your admin credentials to log in:</p>
+        <ol class="list-decimal list-inside space-y-2 ml-2">
+          <li>Enter your <strong>username</strong></li>
+          <li>Enter your <strong>password</strong></li>
+          <li>Click <strong>Login</strong></li>
+        </ol>
+        <p class="mt-4 text-yellow-400">Note: Session lasts for 7 days. After that, you'll need to log in again.</p>
+      `
+    },
+    {
       title: 'Getting Started',
       content: `
         <p class="mb-4">Welcome to OSDSarvaya! This guide will help you get started with using the application.</p>

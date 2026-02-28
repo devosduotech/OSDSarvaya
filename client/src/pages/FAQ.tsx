@@ -12,6 +12,40 @@ const FAQ: React.FC = () => {
 
   const faqs: FAQItem[] = [
     {
+      question: 'How do I create an admin account for the first time?',
+      answer: `On first launch of the application, you'll see a Setup Wizard. Enter a username (min 3 characters) and a password that meets these requirements:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li>At least 8 characters long</li>
+          <li>At least 1 uppercase letter (A-Z)</li>
+          <li>At least 1 numeric digit (0-9)</li>
+        </ul>
+        Click "Create Admin Account" to complete setup.`
+    },
+    {
+      question: 'What are the password requirements?',
+      answer: `Passwords must meet all of these requirements:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li>Minimum 8 characters</li>
+          <li>At least 1 uppercase letter (A-Z)</li>
+          <li>At least 1 numeric digit (0-9)</li>
+        </ul>
+        Example: <code>Admin123</code> or <code>MyPass456</code>`
+    },
+    {
+      question: 'I forgot my password. How do I recover it?',
+      answer: `Unfortunately, there is no password recovery option. You will need to:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li>Delete the database file</li>
+          <li>Reinstall the application</li>
+          <li>Create a new admin account</li>
+        </ul>
+        <p class="mt-2">To delete database:</p>
+        <ul class="list-disc list-inside mt-1 space-y-1">
+          <li>Windows: Delete <code>%APPDATA%/OSDSarvaya/data/</code> folder</li>
+          <li>Docker: Delete the volume or database file</li>
+        </ul>`
+    },
+    {
       question: 'Why is my WhatsApp not connecting?',
       answer: `Make sure:
         <ul class="list-disc list-inside mt-2 space-y-1">
