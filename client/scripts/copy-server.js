@@ -63,6 +63,14 @@ if (fs.existsSync(serverDir)) {
   copyDir(serverDir, targetDir);
   ensureEnvFile();
   copyClientPackageJson();
+  
+  // Remove .env file in packaged app - we use production.env instead
+  const envFile = path.join(targetDir, '.env');
+  if (fs.existsSync(envFile)) {
+    fs.unlinkSync(envFile);
+    console.log('Removed .env file (using production.env instead)');
+  }
+  
   console.log('Server files copied successfully!');
 } else {
   console.error('Server directory not found!');
