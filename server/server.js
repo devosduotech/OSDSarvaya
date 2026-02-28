@@ -968,12 +968,23 @@ io.on('connection', (socket) => {
 // =====================================================
 // Determine correct path based on environment
 let clientBuildPath;
-if (process.env.NODE_ENV === 'production') {
+
+// Check if running in packaged app (Electron)
+const isPackaged = process.resourcesPath !== undefined;
+
+// Check if we're in Docker (has /app/client/dist)
+const dockerPath = path.join(__dirname, '..', 'client', 'dist');
+const packagedPath = path.join(__dirname, '..', 'dist');
+
+if (isPackaged) {
   // In packaged app: server is in app.asar.unpacked/server, dist is in app.asar.unpacked/dist
-  clientBuildPath = path.join(__dirname, '..', 'dist');
+  clientBuildPath = packagedPath;
+} else if (fs.existsSync(dockerPath)) {
+  // In Docker: server is in server/, client is in client/
+  clientBuildPath = dockerPath;
 } else {
-  // In development/Docker: server is in server/, client is in client/
-  clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+  // Fallback
+  clientBuildPath = packagedPath;
 }
 
 logger.info('Serving frontend from:', clientBuildPath);
