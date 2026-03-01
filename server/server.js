@@ -19,27 +19,30 @@ const productionEnvPath = path.join(__dirname, 'production.env');
 const productionEnvPathParent = path.join(__dirname, '..', 'production.env');
 const productionEnvPathResources = path.join(process.resourcesPath, 'production.env');
 
+console.log('=== Loading Environment ===');
+console.log('productionEnvPath:', productionEnvPath, 'exists:', fs.existsSync(productionEnvPath));
+console.log('productionEnvPathParent:', productionEnvPathParent, 'exists:', fs.existsSync(productionEnvPathParent));
+console.log('productionEnvPathResources:', productionEnvPathResources, 'exists:', fs.existsSync(productionEnvPathResources));
+
 let envLoaded = false;
 if (fs.existsSync(productionEnvPath)) {
   require('dotenv').config({ path: productionEnvPath });
-  logger.info('Loaded production.env from:', productionEnvPath);
+  console.log('Loaded from:', productionEnvPath);
   envLoaded = true;
 } else if (fs.existsSync(productionEnvPathParent)) {
   require('dotenv').config({ path: productionEnvPathParent });
-  logger.info('Loaded production.env from:', productionEnvPathParent);
+  console.log('Loaded from:', productionEnvPathParent);
   envLoaded = true;
 } else if (fs.existsSync(productionEnvPathResources)) {
   require('dotenv').config({ path: productionEnvPathResources });
-  logger.info('Loaded production.env from resources:', productionEnvPathResources);
+  console.log('Loaded from resources:', productionEnvPathResources);
   envLoaded = true;
 }
 
-if (envLoaded) {
-  logger.info('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
-  logger.info('ADMIN_PASSWORD set:', !!process.env.ADMIN_PASSWORD);
-  logger.info('ERPNEXT_API_KEY set:', !!process.env.ERPNEXT_API_KEY);
-  logger.info('ERPNEXT_URL:', process.env.ERPNEXT_URL);
-}
+console.log('ENV LOADED:', envLoaded);
+console.log('ERPNEXT_URL:', process.env.ERPNEXT_URL);
+console.log('ERPNEXT_API_KEY set:', !!process.env.ERPNEXT_API_KEY);
+console.log('=======================');
 
 const { APP_VERSION } = require('./version');
 const API_VERSION = 'v1';
