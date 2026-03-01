@@ -11,9 +11,13 @@ const ERPNEXT_API_SECRET = process.env.ERPNEXT_API_SECRET;
 const GRACE_PERIOD_HOURS = 24;
 
 async function callERPNext(method, data) {
+    console.log('ERPNEXT_URL:', ERPNEXT_URL);
+    console.log('ERPNEXT_API_KEY set:', !!ERPNEXT_API_KEY);
+    console.log('ERPNEXT_API_SECRET set:', !!ERPNEXT_API_SECRET);
+    
     if (!ERPNEXT_API_KEY || !ERPNEXT_API_SECRET) {
         logger.error('ERPNext API credentials not configured');
-        throw new Error('ERPNext API credentials not configured');
+        throw new Error('ERPNext API credentials not configured - check production.env');
     }
 
     const url = `${ERPNEXT_URL}/api/method/osdsarvaya_app.api.${method}`;
@@ -74,6 +78,11 @@ router.post('/activate', async (req, res) => {
     try {
         const { licenseKey, email } = req.body;
         const machineId = getMachineId();
+
+        console.log('=== License Activation ===');
+        console.log('licenseKey:', licenseKey);
+        console.log('email:', email);
+        console.log('machineId:', machineId);
 
         if (!licenseKey || !email) {
             return res.status(400).json({ success: false, message: 'License key and email are required' });
