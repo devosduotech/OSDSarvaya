@@ -49,19 +49,18 @@ router.post('/setup', async (req, res) => {
         const saltRounds = 10;
         const hashedPassword = bcrypt.hashSync(password, saltRounds);
 
-        // Generate JWT secret
-        const jwtSecret = require('crypto').randomBytes(64).toString('hex');
+        // Use JWT secret from environment variable
+        const jwtSecret = process.env.JWT_SECRET;
+
+        if (!jwtSecret) {
+            logger.error('JWT_SECRET not configured in environment');
+            return res.status(500).json({ error: 'Server configuration error: JWT_SECRET not set' });
+        }
 
         // Create admin user
         db.run(
             "INSERT INTO admin_user (username, password, jwt_secret) VALUES (?, ?, ?)",
             [username, hashedPassword, jwtSecret]
-        );
-
-        // Store JWT secret in app_config
-        db.run(
-            "INSERT OR REPLACE INTO app_config (key, value) VALUES ('jwt_secret', ?)",
-            [jwtSecret]
         );
 
         // Generate JWT token
@@ -108,13 +107,12 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Get JWT secret
-        const config = db.get("SELECT value FROM app_config WHERE key = 'jwt_secret'");
-        const jwtSecret = config ? config.value : null;
+        // Use JWT secret from environment variable
+        const jwtSecret = process.env.JWT_SECRET;
 
         if (!jwtSecret) {
-            logger.error('JWT secret not found');
-            return res.status(500).json({ error: 'Server configuration error' });
+            logger.error('JWT_SECRET not configured in environment');
+            return res.status(500).json({ error: 'Server configuration error: JWT_SECRET not set' });
         }
 
         // Generate JWT token (7 days)
