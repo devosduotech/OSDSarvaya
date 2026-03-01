@@ -45,7 +45,8 @@ const App: React.FC = () => {
 
   // Check license status after admin setup
   useEffect(() => {
-    if (!isAdminSetup || isCheckingAdmin) return;
+    // Only skip if admin check is still in progress
+    if (isCheckingAdmin) return;
 
     const checkLicense = async () => {
       try {
@@ -60,7 +61,7 @@ const App: React.FC = () => {
       }
     };
     checkLicense();
-  }, [isAdminSetup, isCheckingAdmin]);
+  }, [isCheckingAdmin]);
 
   const handleLicenseActivated = () => {
     setIsLicenseReady(true);
