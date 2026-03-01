@@ -26,9 +26,9 @@ console.log('=== Loading Environment ===');
 console.log('__dirname:', __dirname);
 console.log('process.resourcesPath:', resourcesPath);
 
-// Check if env vars are already available from docker env_file
-const hasEnvFromDocker = !!process.env.ERPNEXT_URL;
-console.log('Environment variables from docker env_file:', hasEnvFromDocker);
+// Check if env vars are already available (from Docker env_file or container)
+const hasEnvFromContainer = !!process.env.ERPNEXT_URL;
+console.log('Environment variables available:', hasEnvFromContainer);
 
 console.log('productionEnvPath:', productionEnvPath, 'exists:', fs.existsSync(productionEnvPath));
 console.log('productionEnvPathParent:', productionEnvPathParent, 'exists:', fs.existsSync(productionEnvPathParent));
@@ -37,9 +37,9 @@ console.log('productionEnvPathResources:', productionEnvPathResources, 'exists:'
 console.log('productionEnvPathResources2:', productionEnvPathResources2, 'exists:', productionEnvPathResources2 ? fs.existsSync(productionEnvPathResources2) : false);
 
 let envLoaded = false;
-if (hasEnvFromDocker) {
-  // Already loaded via docker env_file - no need to load from file
-  console.log('Using environment from docker env_file');
+if (hasEnvFromContainer) {
+  // Already loaded via env_file - no need to load from file
+  console.log('Using environment from container env_file');
   envLoaded = true;
 } else if (fs.existsSync(productionEnvPath)) {
   require('dotenv').config({ path: productionEnvPath });
