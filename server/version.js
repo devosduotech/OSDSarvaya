@@ -38,7 +38,7 @@ function getVersion() {
     const version = execSync('git describe --tags --abbrev=0', { encoding: 'utf8' }).trim();
     return version.replace(/^v/, '');
   } catch (e) {
-    return '1.0.6';
+    return '1.1.0';
   }
 }
 
