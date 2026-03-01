@@ -17,17 +17,29 @@ const dbPromise = require('./database');
 // Load production.env explicitly if it exists (for packaged app)
 const productionEnvPath = path.join(__dirname, 'production.env');
 const productionEnvPathParent = path.join(__dirname, '..', 'production.env');
+const productionEnvPathResources = path.join(process.resourcesPath, 'production.env');
+
+let envLoaded = false;
 if (fs.existsSync(productionEnvPath)) {
   require('dotenv').config({ path: productionEnvPath });
   logger.info('Loaded production.env from:', productionEnvPath);
+  envLoaded = true;
 } else if (fs.existsSync(productionEnvPathParent)) {
   require('dotenv').config({ path: productionEnvPathParent });
   logger.info('Loaded production.env from:', productionEnvPathParent);
+  envLoaded = true;
+} else if (fs.existsSync(productionEnvPathResources)) {
+  require('dotenv').config({ path: productionEnvPathResources });
+  logger.info('Loaded production.env from resources:', productionEnvPathResources);
+  envLoaded = true;
 }
-logger.info('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
-logger.info('ADMIN_PASSWORD set:', !!process.env.ADMIN_PASSWORD);
-logger.info('ERPNEXT_API_KEY set:', !!process.env.ERPNEXT_API_KEY);
-logger.info('ERPNEXT_URL:', process.env.ERPNEXT_URL);
+
+if (envLoaded) {
+  logger.info('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
+  logger.info('ADMIN_PASSWORD set:', !!process.env.ADMIN_PASSWORD);
+  logger.info('ERPNEXT_API_KEY set:', !!process.env.ERPNEXT_API_KEY);
+  logger.info('ERPNEXT_URL:', process.env.ERPNEXT_URL);
+}
 
 const { APP_VERSION } = require('./version');
 const API_VERSION = 'v1';
