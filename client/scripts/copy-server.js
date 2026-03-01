@@ -9,7 +9,7 @@ const clientDir = path.join(__dirname, '..');
 const serverDir = path.join(clientDir, '..', 'server');
 const targetDir = path.join(clientDir, 'server');
 
-const dirsToCopy = ['routes', 'middleware', 'database.js', 'server.js', 'logger.js', 'ecosystem.config.js'];
+const dirsToCopy = ['routes', 'middleware', 'database.js', 'server.js', 'logger.js', 'ecosystem.config.js', 'version.js'];
 const filesToCopy = ['package.json'];
 
 function copyDir(src, dest) {
