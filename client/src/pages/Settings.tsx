@@ -363,10 +363,6 @@ const Settings: React.FC = () => {
                   <p className="font-semibold dark:text-white">{licenseStatus.customerEmail}</p>
                 </div>
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Customer</span>
-                  <p className="font-semibold dark:text-white">{licenseStatus.customerName || 'N/A'}</p>
-                </div>
-                <div>
                   <span className="text-gray-500 dark:text-gray-400">Activated On</span>
                   <p className="font-semibold dark:text-white">
                     {licenseStatus.activationDate ? new Date(licenseStatus.activationDate).toLocaleDateString() : 'N/A'}
@@ -377,14 +373,10 @@ const Settings: React.FC = () => {
           </div>
 
           {/* Version Info */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="text-sm">
             <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
               <span className="text-gray-500 dark:text-gray-400">Application Version</span>
               <p className="font-semibold dark:text-white">{getVersion()}</p>
-            </div>
-            <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
-              <span className="text-gray-500 dark:text-gray-400">ERPNext</span>
-              <p className="font-semibold dark:text-white">Connected</p>
             </div>
           </div>
         </div>

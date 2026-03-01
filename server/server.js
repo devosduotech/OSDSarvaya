@@ -17,12 +17,19 @@ const dbPromise = require('./database');
 // Load production.env explicitly if it exists (for packaged app)
 const productionEnvPath = path.join(__dirname, 'production.env');
 const productionEnvPathParent = path.join(__dirname, '..', 'production.env');
-const productionEnvPathResources = path.join(process.resourcesPath, 'production.env');
+const productionEnvPathParent2 = path.join(__dirname, '..', '..', 'production.env');
+const resourcesPath = process.resourcesPath || '';
+const productionEnvPathResources = resourcesPath ? path.join(resourcesPath, 'production.env') : '';
+const productionEnvPathResources2 = resourcesPath ? path.join(resourcesPath, 'app', 'production.env') : '';
 
 console.log('=== Loading Environment ===');
+console.log('__dirname:', __dirname);
+console.log('process.resourcesPath:', resourcesPath);
 console.log('productionEnvPath:', productionEnvPath, 'exists:', fs.existsSync(productionEnvPath));
 console.log('productionEnvPathParent:', productionEnvPathParent, 'exists:', fs.existsSync(productionEnvPathParent));
-console.log('productionEnvPathResources:', productionEnvPathResources, 'exists:', fs.existsSync(productionEnvPathResources));
+console.log('productionEnvPathParent2:', productionEnvPathParent2, 'exists:', fs.existsSync(productionEnvPathParent2));
+console.log('productionEnvPathResources:', productionEnvPathResources, 'exists:', productionEnvPathResources ? fs.existsSync(productionEnvPathResources) : false);
+console.log('productionEnvPathResources2:', productionEnvPathResources2, 'exists:', productionEnvPathResources2 ? fs.existsSync(productionEnvPathResources2) : false);
 
 let envLoaded = false;
 if (fs.existsSync(productionEnvPath)) {
@@ -33,9 +40,17 @@ if (fs.existsSync(productionEnvPath)) {
   require('dotenv').config({ path: productionEnvPathParent });
   console.log('Loaded from:', productionEnvPathParent);
   envLoaded = true;
-} else if (fs.existsSync(productionEnvPathResources)) {
+} else if (fs.existsSync(productionEnvPathParent2)) {
+  require('dotenv').config({ path: productionEnvPathParent2 });
+  console.log('Loaded from:', productionEnvPathParent2);
+  envLoaded = true;
+} else if (productionEnvPathResources && fs.existsSync(productionEnvPathResources)) {
   require('dotenv').config({ path: productionEnvPathResources });
   console.log('Loaded from resources:', productionEnvPathResources);
+  envLoaded = true;
+} else if (productionEnvPathResources2 && fs.existsSync(productionEnvPathResources2)) {
+  require('dotenv').config({ path: productionEnvPathResources2 });
+  console.log('Loaded from resources2:', productionEnvPathResources2);
   envLoaded = true;
 }
 

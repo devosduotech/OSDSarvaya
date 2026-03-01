@@ -11,13 +11,16 @@ const ERPNEXT_API_SECRET = process.env.ERPNEXT_API_SECRET;
 const GRACE_PERIOD_HOURS = 24;
 
 async function callERPNext(method, data) {
+    console.log('=== ERPNext API Call ===');
     console.log('ERPNEXT_URL:', ERPNEXT_URL);
     console.log('ERPNEXT_API_KEY set:', !!ERPNEXT_API_KEY);
     console.log('ERPNEXT_API_SECRET set:', !!ERPNEXT_API_SECRET);
+    console.log('process.resourcesPath:', process.resourcesPath);
     
     if (!ERPNEXT_API_KEY || !ERPNEXT_API_SECRET) {
-        logger.error('ERPNext API credentials not configured');
-        throw new Error('ERPNext API credentials not configured - check production.env');
+        const errMsg = 'ERPNext API credentials not configured - check production.env. ERPNEXT_API_KEY: ' + (ERPNEXT_API_KEY ? 'set' : 'UNDEFINED') + ', ERPNEXT_API_SECRET: ' + (ERPNEXT_API_SECRET ? 'set' : 'UNDEFINED');
+        logger.error(errMsg);
+        throw new Error(errMsg);
     }
 
     const url = `${ERPNEXT_URL}/api/method/osdsarvaya_app.api.${method}`;
