@@ -180,10 +180,7 @@ async function emitActivity(type, message, meta = {}) {
     const db = await dbPromise;
     await db.run(
       "INSERT INTO activities (type, message, metadata, createdAt) VALUES (?, ?, ?, ?)",
-      type,
-      message,
-      JSON.stringify(meta),
-      activity.timestamp
+      [type, message, JSON.stringify(meta), activity.timestamp]
     );
   } catch (err) {
     logger.error({ err }, 'Failed to save activity to database');

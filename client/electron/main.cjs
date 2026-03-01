@@ -37,7 +37,7 @@ function getPortFromEnv() {
       }
     }
   }
-  return 3201;
+  return 3001;
 }
 
 const PORT = getPortFromEnv();
@@ -77,6 +77,18 @@ async function startServer() {
   process.env.NODE_ENV = 'production';
   process.env.OSDSARVAYA_DATA = dataPath;
   process.env.PORT = PORT.toString();
+  
+  // Redirect server console to electron log
+  const originalConsoleLog = console.log;
+  const originalConsoleError = console.error;
+  console.log = (...args) => {
+    log.info(...args);
+    originalConsoleLog.apply(console, args);
+  };
+  console.error = (...args) => {
+    log.error(...args);
+    originalConsoleError.apply(console, args);
+  };
   
   try {
     // Determine paths based on whether app is packaged
