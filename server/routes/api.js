@@ -168,7 +168,7 @@ router.put('/contacts/:id', async (req, res) => {
     
     try {
         const db = await dbPromise;
-        await db.run("UPDATE contacts SET name = ?, phone = ?, email = ?, tags = ? WHERE id = ?", name, normalizePhone(phone), email, tags, req.params.id);
+        await db.run("UPDATE contacts SET name = ?, phone = ?, email = ?, tags = ? WHERE id = ?", [name, normalizePhone(phone), email, tags, req.params.id]);
         res.json({ id: req.params.id, name, phone: normalizePhone(phone), email, tags });
     } catch (err) { 
         if (err.message.includes('UNIQUE constraint')) {
@@ -248,7 +248,7 @@ router.post('/groups', async (req, res) => {
     const db = await dbPromise;
     try {
         await db.run('BEGIN TRANSACTION');
-        await db.run("INSERT INTO groups (id, name) VALUES (?, ?)", id, name);
+        await db.run("INSERT INTO groups (id, name) VALUES (?, ?)", [id, name]);
         const stmt = await db.prepare("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)");
         for (const contactId of contactIds) {
             await stmt.run(id, contactId);
@@ -265,8 +265,8 @@ router.put('/groups/:id', async (req, res) => {
     const db = await dbPromise;
     try {
         await db.run('BEGIN TRANSACTION');
-        await db.run("UPDATE groups SET name = ? WHERE id = ?", name, groupId);
-        await db.run("DELETE FROM group_contacts WHERE group_id = ?", groupId);
+        await db.run("UPDATE groups SET name = ? WHERE id = ?", [name, groupId]);
+        await db.run("DELETE FROM group_contacts WHERE group_id = ?", [groupId]);
         const stmt = await db.prepare("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)");
         for (const contactId of contactIds) {
             await stmt.run(groupId, contactId);
@@ -288,18 +288,28 @@ router.delete('/groups/:id', async (req, res) => {
 // TEMPLATES
 router.post('/templates', async (req, res) => {
     const { id, name, message, attachment, createdAt } = req.body;
+    
+    if (!name || !name.trim()) {
+        return res.status(400).json({ message: "Template name is required" });
+    }
+    
     try {
         const db = await dbPromise;
-        await db.run("INSERT INTO campaign_templates (id, name, message, attachment, createdAt) VALUES (?, ?, ?, ?, ?)", id, name, message, JSON.stringify(attachment), createdAt);
+        await db.run("INSERT INTO campaign_templates (id, name, message, attachment, createdAt) VALUES (?, ?, ?, ?, ?)", [id, name.trim(), message, JSON.stringify(attachment), createdAt]);
         res.status(201).json(req.body);
     } catch (err) { logger.error({ err }, "Failed to create template"); res.status(500).json({ message: "Error creating template" }); }
 });
 
 router.put('/templates/:id', async (req, res) => {
     const { name, message, attachment } = req.body;
+    
+    if (!name || !name.trim()) {
+        return res.status(400).json({ message: "Template name is required" });
+    }
+    
     try {
         const db = await dbPromise;
-        await db.run("UPDATE campaign_templates SET name = ?, message = ?, attachment = ? WHERE id = ?", name, message, JSON.stringify(attachment), req.params.id);
+        await db.run("UPDATE campaign_templates SET name = ?, message = ?, attachment = ? WHERE id = ?", [name, message, JSON.stringify(attachment), req.params.id]);
         res.json(req.body);
     } catch (err) { logger.error({ err }, "Failed to update template"); res.status(500).json({ message: "Error updating template" }); }
 });

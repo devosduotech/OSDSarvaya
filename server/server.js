@@ -554,7 +554,7 @@ setInterval(async () => {
     for (const run of dueRuns) {
       logger.info(`Starting scheduled campaign: ${run.id}`);
       
-      await db.run(`UPDATE campaign_runs SET status = 'Sending' WHERE id = ?`, run.id);
+      await db.run(`UPDATE campaign_runs SET status = 'Sending' WHERE id = ?`, [run.id]);
       
       const groupIds = JSON.parse(run.targetGroupIds);
       isCampaignRunning = true;
@@ -603,7 +603,7 @@ app.post('/api/campaigns/cancel/:id', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Can only cancel queued campaigns' });
     }
 
-    await db.run("UPDATE campaign_runs SET status = 'Cancelled' WHERE id = ?", id);
+    await db.run("UPDATE campaign_runs SET status = 'Cancelled' WHERE id = ?", [id]);
     
     emitActivity('campaign_cancelled', 'Campaign cancelled from queue', { runId: id });
 
@@ -869,7 +869,7 @@ async function processRun(runId, templateId, groupIds) {
       `, ...groupIds, runId);
       
       // Update retry count
-      await db.run(`UPDATE campaign_runs SET retryCount = ? WHERE id=?`, currentRetryCount + 1, runId);
+      await db.run(`UPDATE campaign_runs SET retryCount = ? WHERE id=?`, [currentRetryCount + 1, runId]);
       
       // Retry sending to failed contacts
       for (const contact of failedContacts) {
@@ -950,7 +950,7 @@ async function processRun(runId, templateId, groupIds) {
     if (nextQueued) {
       logger.info(`Auto-starting queued campaign: ${nextQueued.id}`);
       
-      await db.run(`UPDATE campaign_runs SET status = 'Sending' WHERE id = ?`, nextQueued.id);
+      await db.run(`UPDATE campaign_runs SET status = 'Sending' WHERE id = ?`, [nextQueued.id]);
       
       const groupIds = JSON.parse(nextQueued.targetGroupIds);
       isCampaignRunning = true;
