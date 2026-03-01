@@ -1003,32 +1003,50 @@ io.on('connection', (socket) => {
 // FRONTEND
 // =====================================================
 // Determine correct path based on environment
-let clientBuildPath;
+
+console.log('=== Determining Frontend Path ===');
+console.log('__dirname:', __dirname);
+console.log('process.resourcesPath:', process.resourcesPath);
 
 // Check if running in packaged app (Electron)
-const isPackaged = process.resourcesPath !== undefined;
+const isPackaged = !!process.resourcesPath;
 
 // Check if we're in Docker (has /app/client/dist)
 const dockerPath = path.join(__dirname, '..', 'client', 'dist');
 const packagedPath = path.join(__dirname, '..', 'dist');
+const packagedPath2 = path.join(__dirname, '..', '..', 'dist');
 
+console.log('isPackaged:', isPackaged);
+console.log('dockerPath:', dockerPath, 'exists:', fs.existsSync(dockerPath));
+console.log('packagedPath:', packagedPath, 'exists:', fs.existsSync(packagedPath));
+console.log('packagedPath2:', packagedPath2, 'exists:', fs.existsSync(packagedPath2));
+
+let clientBuildPath;
 if (isPackaged) {
   // In packaged app: server is in app.asar.unpacked/server, dist is in app.asar.unpacked/dist
-  clientBuildPath = packagedPath;
+  if (fs.existsSync(packagedPath)) {
+    clientBuildPath = packagedPath;
+  } else if (fs.existsSync(packagedPath2)) {
+    clientBuildPath = packagedPath2;
+  }
 } else if (fs.existsSync(dockerPath)) {
   // In Docker: server is in server/, client is in client/
   clientBuildPath = dockerPath;
-} else {
-  // Fallback
+} else if (fs.existsSync(packagedPath)) {
   clientBuildPath = packagedPath;
 }
 
-logger.info('Serving frontend from:', clientBuildPath);
+console.log('clientBuildPath selected:', clientBuildPath);
+console.log('===========================');
 
-app.use(express.static(clientBuildPath));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(clientBuildPath, 'index.html'));
-});
+if (!clientBuildPath || !fs.existsSync(clientBuildPath)) {
+  console.error('ERROR: Frontend build path not found!');
+} else {
+  app.use(express.static(clientBuildPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
 
 
 // =====================================================
