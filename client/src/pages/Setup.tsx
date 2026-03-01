@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import logo from '../assets/Logo.png';
+import { getVersion } from '../version';
 
 const Setup: React.FC = () => {
   const { login } = useAppContext();
@@ -154,7 +155,7 @@ const Setup: React.FC = () => {
 
         <div className="mt-6 pt-6 border-t border-gray-700 text-center">
           <p className="text-gray-400 text-sm">
-            Version 1.0.7
+            Version {getVersion()}
           </p>
         </div>
       </Card>

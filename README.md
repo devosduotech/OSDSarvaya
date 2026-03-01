@@ -14,7 +14,7 @@ WhatsApp Bulk Messaging Application by OSDuo Tech
 
 1. Download `OSDSarvayaSetup.exe` from the [releases](../../releases)
 2. Run the installer
-3. Default login: `admin` / `admin@123`
+3. Create admin account (first-time setup)
 4. Activate license (requires internet)
 5. Scan WhatsApp QR code to connect
 
@@ -33,10 +33,23 @@ Access at: http://localhost:3001
 
 ---
 
-## Default Credentials
+## First-Time Setup
 
-- **Username:** admin
-- **Password:** admin@123
+On first launch, the application will prompt you to create an admin account:
+
+1. Open application in browser (http://localhost:3001)
+2. You will be redirected to Setup page
+3. Create admin account:
+   - Username: min 3 characters
+   - Password: min 8 characters, 1 uppercase, 1 number
+4. After setup, login with your credentials
+
+---
+
+## Default Credentials (After Setup)
+
+- **Username:** (you choose during setup)
+- **Password:** (you choose during setup)
 
 ---
 
@@ -63,10 +76,6 @@ OSDSarvaya requires license activation via ERPNext.
 2. Go to Settings → License & About
 3. Enter License Key and Email
 4. Click "Activate License"
-
-### Test License:
-- **License Key:** OSDS-8C3T-3GY3-UXYH
-- **Email:** info@osduotech.com
 
 ---
 

@@ -10,7 +10,7 @@ This guide covers installing OSDSarvaya on Windows and Ubuntu.
 | Feature | Windows | Ubuntu |
 |---------|---------|--------|
 | Installation | Run .exe installer | Clone repo + docker-compose |
-| No. of Steps | 3 | 4 |
+| No. of Steps | 4 | 4 |
 | Technical Skill | Minimal | Basic |
 
 ---
@@ -32,9 +32,12 @@ Copy `OSDSarvayaSetup.exe` to the Windows laptop (via USB or Google Drive)
 ### Step 2: Access Application
 Browser opens automatically: http://localhost:3001
 
-### Step 3: Login
-- Username: `admin`
-- Password: `admin@123`
+### Step 3: First-Time Setup
+1. You will be redirected to Setup page
+2. Create admin account:
+   - Username: min 3 characters
+   - Password: min 8 characters, 1 uppercase letter, 1 number
+3. Click "Create Admin Account"
 
 ### Step 4: Activate License
 1. Go to Settings → License & About
@@ -110,10 +113,11 @@ docker ps
 docker logs -f osdsarvaya-app
 ```
 
-### Step 6: Access Application
-Open browser: http://localhost:3001
-
-Login: admin / admin@123
+### Step 6: First-Time Setup
+1. Open browser: http://localhost:3001
+2. Create admin account on the Setup page
+3. Login with your credentials
+4. Activate license in Settings
 
 ---
 
@@ -219,10 +223,6 @@ OSDSarvaya uses ERPNext for license management.
 - Hardware-based machine ID
 - 24-hour offline grace period
 - License validation on startup
-
-## Test License:
-- **Key:** OSDS-8C3T-3GY3-UXYH
-- **Email:** info@osduotech.com
 
 ---
 
