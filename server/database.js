@@ -13,7 +13,10 @@ function getDataPath() {
     return path.join(__dirname, 'data');
 }
 
-const DB_PATH = path.join(getDataPath(), 'osdsarvaya.db');
+// Get DB_PATH dynamically when needed, not at module load time
+function getDbPath() {
+    return path.join(getDataPath(), 'osdsarvaya.db');
+}
 
 let db = null;
 let SQL = null;
@@ -23,11 +26,11 @@ function saveDatabase() {
         try {
             const data = db.export();
             const buffer = Buffer.from(data);
-            const dir = path.dirname(DB_PATH);
+            const dir = path.dirname(getDbPath());
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
-            fs.writeFileSync(DB_PATH, buffer);
+            fs.writeFileSync(getDbPath(), buffer);
         } catch (e) {
             logger.error({ e }, 'Failed to save database');
         }
@@ -90,8 +93,8 @@ const initializeDb = async () => {
     try {
         SQL = await initSqlJs();
         
-        if (fs.existsSync(DB_PATH)) {
-            const fileBuffer = fs.readFileSync(DB_PATH);
+        if (fs.existsSync(getDbPath())) {
+            const fileBuffer = fs.readFileSync(getDbPath());
             db = new SQL.Database(fileBuffer);
             logger.info('Database loaded from file.');
         } else {

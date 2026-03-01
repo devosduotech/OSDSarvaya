@@ -87,8 +87,10 @@ function getDataPath() {
     return path.join(__dirname, 'data');
 }
 
-const DATA_PATH = getDataPath();
-const SESSION_PATH = path.join(DATA_PATH, '.wwebjs_auth');
+// Get DATA_PATH dynamically
+function getSessionPath() {
+    return path.join(getDataPath(), '.wwebjs_auth');
+}
 
 let waClient = null;
 let waStatus = 'DISCONNECTED';
@@ -286,7 +288,7 @@ async function initializeWhatsAppClient() {
   try {
 
     logger.info('Cleaning Chromium locks...');
-    cleanChromiumLocks(SESSION_PATH);
+    cleanChromiumLocks(getSessionPath());
     await new Promise(r => setTimeout(r, 1500));
 
     logger.info('Initializing WhatsApp Client...');
@@ -306,7 +308,7 @@ async function initializeWhatsAppClient() {
     }
 
     waClient = new Client({
-      authStrategy: new LocalAuth({ dataPath: SESSION_PATH }),
+      authStrategy: new LocalAuth({ dataPath: getSessionPath() }),
       puppeteer: puppeteerOptions
     });
 
@@ -1084,7 +1086,7 @@ process.on('SIGINT', gracefulShutdown);
 // =====================================================
 async function startServer() {
 
-  await fsPromises.mkdir(DATA_PATH, { recursive: true });
+  await fsPromises.mkdir(getDataPath(), { recursive: true });
   await dbPromise;
 
   server.listen(PORT, '0.0.0.0', () => {
