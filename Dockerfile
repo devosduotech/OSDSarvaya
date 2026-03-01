@@ -3,7 +3,7 @@ FROM node:18-bullseye
 # -----------------------------
 # Build Arguments
 # -----------------------------
-ARG APP_VERSION=1.0.0
+ARG APP_VERSION=__VERSION__
 
 # -----------------------------
 # Install Chromium + Dependencies
