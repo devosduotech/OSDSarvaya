@@ -295,7 +295,8 @@ router.post('/templates', async (req, res) => {
     
     try {
         const db = await dbPromise;
-        await db.run("INSERT INTO campaign_templates (id, name, message, attachment, createdAt) VALUES (?, ?, ?, ?, ?)", [id, name.trim(), message, JSON.stringify(attachment), createdAt]);
+        const attachmentStr = attachment ? JSON.stringify(attachment) : '';
+        await db.run("INSERT INTO campaign_templates (id, name, message, attachment, createdAt) VALUES (?, ?, ?, ?, ?)", [id, name.trim(), message || '', attachmentStr, createdAt]);
         res.status(201).json(req.body);
     } catch (err) { logger.error({ err }, "Failed to create template"); res.status(500).json({ message: "Error creating template" }); }
 });
@@ -309,7 +310,8 @@ router.put('/templates/:id', async (req, res) => {
     
     try {
         const db = await dbPromise;
-        await db.run("UPDATE campaign_templates SET name = ?, message = ?, attachment = ? WHERE id = ?", [name, message, JSON.stringify(attachment), req.params.id]);
+        const attachmentStr = attachment ? JSON.stringify(attachment) : '';
+        await db.run("UPDATE campaign_templates SET name = ?, message = ?, attachment = ? WHERE id = ?", [name.trim(), message || '', attachmentStr, req.params.id]);
         res.json(req.body);
     } catch (err) { logger.error({ err }, "Failed to update template"); res.status(500).json({ message: "Error updating template" }); }
 });
