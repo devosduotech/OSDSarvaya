@@ -9,8 +9,8 @@ This guide covers installing OSDSarvaya on Windows and Ubuntu.
 
 | Feature | Windows | Ubuntu |
 |---------|---------|--------|
-| Installation | Double-click .exe | Clone repo + docker-compose |
-| No. of Steps | 3 | 6 |
+| Installation | Run .exe installer | Clone repo + docker-compose |
+| No. of Steps | 3 | 4 |
 | Technical Skill | Minimal | Basic |
 
 ---
@@ -18,16 +18,16 @@ This guide covers installing OSDSarvaya on Windows and Ubuntu.
 # Windows Installation
 
 ## Files Needed
-Copy `OSDSarvaya.exe` to the Windows laptop (via USB or Google Drive)
+Copy `OSDSarvayaSetup.exe` to the Windows laptop (via USB or Google Drive)
 
-**Location:** `client/release/OSDSarvaya.exe` (~69 MB)
+**Location:** `client/release/OSDSarvayaSetup.exe` (~99 MB)
 
 ## Installation Steps
 
 ### Step 1: Copy & Run
-1. Copy `OSDSarvaya.exe` to any folder (e.g., Desktop)
-2. Double-click to run
-3. Wait 10-15 seconds for first start
+1. Copy `OSDSarvayaSetup.exe` to any folder (e.g., Desktop)
+2. Double-click to run the installer
+3. Follow the installation wizard
 
 ### Step 2: Access Application
 Browser opens automatically: http://localhost:3001
@@ -36,7 +36,12 @@ Browser opens automatically: http://localhost:3001
 - Username: `admin`
 - Password: `admin@123`
 
-### Step 4: Connect WhatsApp
+### Step 4: Activate License
+1. Go to Settings → License & About
+2. Enter License Key and Email
+3. Click "Activate License"
+
+### Step 5: Connect WhatsApp
 1. Go to Settings (left sidebar)
 2. Click "Connect WhatsApp"
 3. Open WhatsApp on phone: Settings → Linked Devices → Link Device
@@ -49,6 +54,7 @@ Browser opens automatically: http://localhost:3001
 ## Prerequisites
 - Ubuntu 20.04 or later
 - Internet connection
+- Docker & Docker Compose installed
 
 ## Installation Steps
 
@@ -65,16 +71,11 @@ sudo usermod -aG docker $USER
 
 ### Step 2: Clone Repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/OSDSarvaya.git
+git clone https://github.com/devosduotech/OSDSarvaya.git
 cd OSDSarvaya
 ```
 
 ### Step 3: Configure Environment
-```bash
-# Generate a secure JWT_SECRET
-openssl rand -base64 32
-```
-
 Edit `production.env`:
 ```bash
 nano production.env
@@ -85,25 +86,28 @@ Update with your values:
 NODE_ENV=production
 PORT=3001
 CORS_ORIGIN=http://localhost:3001
-JWT_SECRET=your_generated_secret_here
+JWT_SECRET=change_this_to_a_secure_random_string
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin@123
 MESSAGES_PER_HOUR=60
+ERPNEXT_URL=https://your-erpnext-site.com
+ERPNEXT_API_KEY=your_api_key
+ERPNEXT_API_SECRET=your_api_secret
 ```
 
 ### Step 4: Build & Run
 ```bash
 # Build Docker image and start container
-docker-compose up -d --build
+./build.sh
 ```
 
 ### Step 5: Verify Running
 ```bash
 # Check container status
-docker-compose ps
+docker ps
 
 # View logs
-docker-compose logs -f
+docker logs -f osdsarvaya-app
 ```
 
 ### Step 6: Access Application
@@ -119,19 +123,19 @@ Login: admin / admin@123
 
 | Action | How |
 |--------|-----|
-| Start | Double-click OSDSarvaya.exe |
-| Stop | Close the window |
-| View Data | %APPDATA%/OSDSarvaya/ |
+| Start | Double-click OSDSarvaya shortcut |
+| Stop | Close the application window |
+| View Data | %APPDATA%/OSDSarvaya/data/ |
 
 ## Ubuntu (Docker)
 
 | Action | Command |
 |--------|---------|
-| Start | docker-compose up -d |
-| Stop | docker-compose down |
-| Restart | docker-compose restart |
-| View Logs | docker-compose logs -f |
-| Rebuild | docker-compose up -d --build |
+| Start | docker compose up -d |
+| Stop | docker compose down |
+| Restart | docker compose restart |
+| View Logs | docker logs -f osdsarvaya-app |
+| Rebuild | ./build.sh |
 
 ---
 
@@ -139,12 +143,17 @@ Login: admin / admin@123
 
 ## Windows
 
-**Issue:** App not opening
-- Make sure no other app is using port 3001
-- Check Windows Firewall settings
+**Issue:** App stuck on "Loading..."
+- Check main.log at %APPDATA%/OSDSarvaya/logs/
+- Ensure production.env is being loaded correctly
+
+**Issue:** License activation fails
+- Check internet connection
+- Verify ERPNext_URL is accessible
+- Check API credentials in production.env
 
 **Issue:** WhatsApp disconnected
-- Data may be corrupted. Delete `%APPDATA%/OSDSarvaya/` and restart
+- Delete %APPDATA%/OSDSarvaya/ and restart
 
 ## Ubuntu
 
@@ -158,14 +167,12 @@ sudo usermod -aG docker $USER
 ```bash
 # Find what's using port 3001
 sudo lsof -i :3001
-
-# Change port in production.env and docker-compose.yml
 ```
 
 **Issue:** Container won't start
 ```bash
 # Check logs
-docker-compose logs
+docker logs osdsarvaya-app
 ```
 
 ---
@@ -173,7 +180,7 @@ docker-compose logs
 # Updating OSDSarvaya
 
 ## Windows
-Replace `OSDSarvaya.exe` with the new version.
+Replace `OSDSarvayaSetup.exe` with the new version and reinstall.
 
 ## Ubuntu
 ```bash
@@ -181,7 +188,7 @@ Replace `OSDSarvaya.exe` with the new version.
 git pull origin main
 
 # Rebuild and restart
-docker-compose up -d --build
+./build.sh
 ```
 
 ---
@@ -189,8 +196,8 @@ docker-compose up -d --build
 # Data Storage
 
 ## Windows
-- Location: `%APPDATA%/OSDSarvaya/`
-- Contains: WhatsApp session, database, logs
+- Location: `%APPDATA%/OSDSarvaya/data/`
+- Contains: WhatsApp session, database, license cache
 
 ## Ubuntu (Docker)
 - Session: Docker volume `osdsarvaya_session`
@@ -200,6 +207,22 @@ To backup:
 ```bash
 docker cp osdsarvaya-app:/app/server/data ./backup
 ```
+
+---
+
+# License System
+
+OSDSarvaya uses ERPNext for license management.
+
+## Features:
+- License key + email activation
+- Hardware-based machine ID
+- 24-hour offline grace period
+- License validation on startup
+
+## Test License:
+- **Key:** OSDS-8C3T-3GY3-UXYH
+- **Email:** info@osduotech.com
 
 ---
 
