@@ -5,7 +5,7 @@ LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
 
 if [ -z "$LATEST_TAG" ]; then
     echo "No git tag found, using default version 1.1.0"
-    LATEST_TAG="1.1.0"
+    LATEST_TAG="1.1.2"
 fi
 
 echo "Setting version to: $LATEST_TAG"
