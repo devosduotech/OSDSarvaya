@@ -69,13 +69,17 @@ router.get('/data', async (req, res) => {
 router.post('/contacts', async (req, res) => {
     const { id, name, phone, email, tags } = req.body;
     
+    if (!name || !name.trim()) {
+        return res.status(400).json({ message: "Name is required" });
+    }
+    
     if (!isValidPhone(phone)) {
         return res.status(400).json({ message: "Invalid phone number. Must be 10-15 digits." });
     }
     
     try {
         const db = await dbPromise;
-        await db.run("INSERT INTO contacts (id, name, phone, email, tags) VALUES (?, ?, ?, ?, ?)", id, name, normalizePhone(phone), email, tags);
+        await db.run("INSERT INTO contacts (id, name, phone, email, tags) VALUES (?, ?, ?, ?, ?)", [id, name.trim(), normalizePhone(phone), email, tags]);
         res.status(201).json({ id, name, phone: normalizePhone(phone), email, tags });
     } catch (err) { 
         if (err.message.includes('UNIQUE constraint')) {
