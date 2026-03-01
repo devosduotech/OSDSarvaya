@@ -15,8 +15,35 @@ log.info('App is packaged:', app.isPackaged);
 log.info('Resources path:', process.resourcesPath);
 
 let mainWindow = null;
-const PORT = 3001;
+
+function getPortFromEnv() {
+  // Try to read PORT from production.env
+  const envPaths = app.isPackaged
+    ? [
+        path.join(process.resourcesPath, 'production.env'),
+        path.join(process.resourcesPath, 'app', 'production.env')
+      ]
+    : [
+        path.join(__dirname, '..', 'production.env'),
+        path.join(__dirname, '..', '..', 'production.env')
+      ];
+  
+  for (const envPath of envPaths) {
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      const match = content.match(/^PORT=(\d+)/m);
+      if (match) {
+        return parseInt(match[1]);
+      }
+    }
+  }
+  return 3201;
+}
+
+const PORT = getPortFromEnv();
 const SERVER_URL = `http://localhost:${PORT}`;
+
+log.info('Server will run on port:', PORT);
 
 function getDistPath() {
   if (app.isPackaged) {
