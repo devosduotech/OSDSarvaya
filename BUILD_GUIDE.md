@@ -24,6 +24,8 @@ npm run electron:build
 
 **Output:** `client/release/OSDSarvayaSetup.exe`
 
+The Windows installer includes a default JWT_SECRET that works for all installations.
+
 ---
 
 ## Docker Deployment
@@ -62,9 +64,6 @@ docker compose up -d
 ```bash
 # Check git tags
 git tag -l
-
-# Check server version at runtime
-docker exec osdsarvaya-app cat /app/server/data/osdsarvaya.db
 ```
 
 ### Creating a New Release
@@ -86,37 +85,44 @@ git push origin main --tags
 
 ---
 
-## Environment Variables (production.env)
+## Environment Variables
+
+### For Windows Installation
+The Windows installer includes default values. Optional to customize:
 
 ```env
 NODE_ENV=production
 PORT=3001
-CORS_ORIGIN=http://localhost:3001
-JWT_SECRET=change_this_to_a_secure_random_string
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin@123
+JWT_SECRET=osdsarvaya_default_secret_key_2024_v1
 MESSAGES_PER_HOUR=60
 ERPNEXT_URL=https://dvarika.osduotech.com
 ERPNEXT_API_KEY=your_api_key
 ERPNEXT_API_SECRET=your_api_secret
 ```
 
-### Required Variables:
-| Variable | Description |
-|----------|-------------|
-| PORT | Server port (default: 3001) |
-| JWT_SECRET | Secret for JWT tokens |
-| ADMIN_USERNAME | Admin login username |
-| ADMIN_PASSWORD | Admin login password |
-| ERPNEXT_URL | ERPNext instance URL |
-| ERPNEXT_API_KEY | ERPNext API key |
-| ERPNEXT_API_SECRET | ERPNext API secret |
+### For Docker/Ubuntu
+Edit `production.env` before running:
 
----
+```env
+NODE_ENV=production
+PORT=3001
+CORS_ORIGIN=http://localhost:3001
+JWT_SECRET=osdsarvaya_default_secret_key_2024_v1
+MESSAGES_PER_HOUR=60
+ERPNEXT_URL=https://your-erpnext-site.com
+ERPNEXT_API_KEY=your_api_key
+ERPNEXT_API_SECRET=your_api_secret
+```
 
-## Default Login
-- Username: `admin`
-- Password: `admin@123`
+### Environment Variables Reference
+| Variable | Required | Description |
+|----------|----------|-------------|
+| PORT | No | Server port (default: 3001) |
+| JWT_SECRET | No | JWT secret (default provided for Windows) |
+| ERPNEXT_URL | Yes | ERPNext instance URL |
+| ERPNEXT_API_KEY | Yes | ERPNext API key |
+| ERPNEXT_API_SECRET | Yes | ERPNext API secret |
+| MESSAGES_PER_HOUR | No | Message rate limit (default: 60) |
 
 ---
 

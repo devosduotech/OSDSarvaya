@@ -1,4 +1,3 @@
-
 # OSDSarvaya - Installation & Deployment Guide
 
 This guide covers installing OSDSarvaya on Windows and Ubuntu.
@@ -84,14 +83,12 @@ Edit `production.env`:
 nano production.env
 ```
 
-Update with your values:
+Update with your values (or use default):
 ```env
 NODE_ENV=production
 PORT=3001
 CORS_ORIGIN=http://localhost:3001
-JWT_SECRET=change_this_to_a_secure_random_string
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin@123
+JWT_SECRET=osdsarvaya_default_secret_key_2024_v1
 MESSAGES_PER_HOUR=60
 ERPNEXT_URL=https://your-erpnext-site.com
 ERPNEXT_API_KEY=your_api_key

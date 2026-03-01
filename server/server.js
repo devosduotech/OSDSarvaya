@@ -67,6 +67,12 @@ console.log('ENV LOADED:', envLoaded);
 console.log('ERPNEXT_URL:', process.env.ERPNEXT_URL);
 console.log('ERPNEXT_API_KEY set:', !!process.env.ERPNEXT_API_KEY);
 console.log('JWT_SECRET set:', !!process.env.JWT_SECRET);
+
+// Set default JWT_SECRET if not provided (for Windows packaged app)
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'osdsarvaya_default_secret_key_2024_v1';
+  console.log('JWT_SECRET: Using default for Windows');
+}
 console.log('=======================');
 
 const { APP_VERSION } = require('./version');
@@ -215,31 +221,6 @@ app.get('/api/version', (req, res) => {
 // =====================================================
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
-});
-
-
-// =====================================================
-// LOGIN
-// =====================================================
-app.post('/api/login', (req, res) => {
-
-  const { username, password } = req.body;
-
-  if (
-    username === process.env.ADMIN_USERNAME &&
-    password === process.env.ADMIN_PASSWORD
-  ) {
-
-    const token = jwt.sign(
-      { username },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    return res.json({ success: true, token });
-  }
-
-  return res.status(401).json({ success: false });
 });
 
 
