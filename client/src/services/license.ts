@@ -127,7 +127,7 @@ async function validateLicense(): Promise<LicenseValidationResponse> {
   }
 }
 
-async function checkLicenseStatus(): Promise<{ activated: boolean; licenseKey?: string; customerEmail?: string; customerName?: string }> {
+async function checkLicenseStatus(): Promise<{ activated: boolean; licenseKey?: string; customerEmail?: string; customerName?: string; activationDate?: string }> {
   try {
     const response = await fetch(`${API_BASE}/api/license/check`, {
       method: 'GET',
@@ -153,7 +153,8 @@ async function checkLicenseStatus(): Promise<{ activated: boolean; licenseKey?: 
       activated: data.activated,
       licenseKey: data.licenseKey,
       customerEmail: data.customerEmail,
-      customerName: data.customerName
+      customerName: data.customerName,
+      activationDate: data.activationDate
     };
   } catch (err) {
     console.error('License status check error:', err);
