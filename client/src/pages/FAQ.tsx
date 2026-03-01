@@ -12,6 +12,31 @@ const FAQ: React.FC = () => {
 
   const faqs: FAQItem[] = [
     {
+      question: 'How do I activate my license?',
+      answer: `On first launch, you'll see a License Activation screen. Enter your:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li><strong>License Key</strong> - Format: OSDS-XXXX-XXXX-XXXX-XXXX</li>
+          <li><strong>Email Address</strong> - The email associated with your license</li>
+        </ul>
+        Click "Activate License" to complete the activation.`
+    },
+    {
+      question: 'What happens if my license expires?',
+      answer: `OSDSarvaya licenses are perpetual - they don't expire. You can use the license for all future upgrades. If there's an issue with your license, contact support.`
+    },
+    {
+      question: 'Can I transfer my license to another computer?',
+      answer: `Yes, contact our support team to request a license transfer. You'll need to provide your current license key and the new machine details.`
+    },
+    {
+      question: 'How is my machine ID generated?',
+      answer: `The machine ID is automatically generated from your computer's hardware identifiers (such as machine-id on Linux or UUID on Windows). This ensures each installation has a unique identifier tied to the physical machine.`
+    },
+    {
+      question: 'What if I need to change my hardware?',
+      answer: `If you change significant hardware components, your machine ID may change. In such cases, contact support for assistance with license transfer to the new machine.`
+    },
+    {
       question: 'How do I create an admin account for the first time?',
       answer: `On first launch of the application, you'll see a Setup Wizard. Enter a username (min 3 characters) and a password that meets these requirements:
         <ul class="list-disc list-inside mt-2 space-y-1">

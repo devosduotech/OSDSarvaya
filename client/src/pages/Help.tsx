@@ -5,6 +5,19 @@ const Help: React.FC = () => {
 
   const sections = [
     {
+      title: 'License Activation',
+      content: `
+        <p class="mb-4">OSDSarvaya requires a valid license to operate. On first launch, you'll need to activate your license:</p>
+        <ol class="list-decimal list-inside space-y-2 ml-2">
+          <li>Enter your <strong>License Key</strong> (format: OSDS-XXXX-XXXX-XXXX-XXXX)</li>
+          <li>Enter the <strong>Email Address</strong> associated with your license</li>
+          <li>Click <strong>Activate License</strong></li>
+        </ol>
+        <p class="mt-4 text-yellow-400">Important: The license is tied to your machine. If you change computers, contact support for license transfer.</p>
+        <p class="mt-2 text-gray-400">Your machine ID is automatically generated from hardware identifiers for security purposes.</p>
+      `
+    },
+    {
       title: 'First Time Setup',
       content: `
         <p class="mb-4">On first launch, you'll need to create an admin account:</p>

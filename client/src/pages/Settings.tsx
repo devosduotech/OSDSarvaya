@@ -5,13 +5,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { UploadIcon } from '../components/icons/Icons';
 import { getVersion } from '../version';
-
-interface ServerVersion {
-  appVersion: string;
-  apiVersion: string;
-  environment: string;
-  timestamp: string;
-}
+import { licenseService } from '../services/license';
 
 const Settings: React.FC = () => {
 
@@ -38,17 +32,20 @@ const Settings: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [serverVersion, setServerVersion] = useState<ServerVersion | null>(null);
+  const [licenseStatus, setLicenseStatus] = useState<{
+    activated: boolean;
+    licenseKey?: string;
+    customerEmail?: string;
+    customerName?: string;
+    activationDate?: string;
+  } | null>(null);
 
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
 
   useEffect(() => {
-    fetch('/api/version')
-      .then(res => res.json())
-      .then(setServerVersion)
-      .catch(console.error);
+    licenseService.checkLicenseStatus().then(setLicenseStatus);
   }, []);
 
   useEffect(() => {
@@ -339,30 +336,55 @@ const Settings: React.FC = () => {
         </div>
       </Card>
 
-      {/* VERSION INFO */}
+      {/* LICENSE & ABOUT */}
       <Card>
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold dark:text-white">About & Version</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Application version information for support
-          </p>
+          <h3 className="text-lg font-semibold dark:text-white">License & About</h3>
+          
+          {/* License Status */}
+          <div className="p-4 border rounded-lg bg-gray-50 dark:bg-slate-700 dark:border-slate-600">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className={`h-3 w-3 rounded-full ${licenseStatus?.activated ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                <span className="text-sm font-medium dark:text-white">
+                  License: <b>{licenseStatus?.activated ? 'Active' : 'Not Active'}</b>
+                </span>
+              </div>
+            </div>
+            
+            {licenseStatus?.activated && (
+              <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">License Key</span>
+                  <p className="font-semibold dark:text-white">{licenseStatus.licenseKey}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Email</span>
+                  <p className="font-semibold dark:text-white">{licenseStatus.customerEmail}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Customer</span>
+                  <p className="font-semibold dark:text-white">{licenseStatus.customerName || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Activated On</span>
+                  <p className="font-semibold dark:text-white">
+                    {licenseStatus.activationDate ? new Date(licenseStatus.activationDate).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
+          {/* Version Info */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
-              <span className="text-gray-500 dark:text-gray-400">Client Version</span>
+              <span className="text-gray-500 dark:text-gray-400">Application Version</span>
               <p className="font-semibold dark:text-white">{getVersion()}</p>
             </div>
             <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
-              <span className="text-gray-500 dark:text-gray-400">Server Version</span>
-              <p className="font-semibold dark:text-white">{serverVersion?.appVersion || 'Loading...'}</p>
-            </div>
-            <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
-              <span className="text-gray-500 dark:text-gray-400">API Version</span>
-              <p className="font-semibold dark:text-white">{serverVersion?.apiVersion || 'Loading...'}</p>
-            </div>
-            <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
-              <span className="text-gray-500 dark:text-gray-400">Environment</span>
-              <p className="font-semibold dark:text-white">{serverVersion?.environment || 'Loading...'}</p>
+              <span className="text-gray-500 dark:text-gray-400">ERPNext</span>
+              <p className="font-semibold dark:text-white">Connected</p>
             </div>
           </div>
         </div>
