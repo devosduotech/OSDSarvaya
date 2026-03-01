@@ -18,22 +18,27 @@ async function callERPNext(method, data) {
 
     const url = `${ERPNEXT_URL}/api/method/osdsarvaya_app.api.${method}`;
     
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `token ${ERPNEXT_API_KEY}:${ERPNEXT_API_SECRET}`
-        },
-        body: JSON.stringify(data)
-    });
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `token ${ERPNEXT_API_KEY}:${ERPNEXT_API_SECRET}`
+            },
+            body: JSON.stringify(data)
+        });
 
-    const result = await response.json();
-    
-    if (result.message) {
-        return result.message;
+        const result = await response.json();
+        
+        if (result.message) {
+            return result.message;
+        }
+        
+        return result;
+    } catch (err) {
+        logger.error({ err }, 'ERPNext API call failed');
+        throw err;
     }
-    
-    return result;
 }
 
 async function getCachedValidation(licenseKey) {

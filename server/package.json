@@ -20,5 +20,8 @@
     "socket.io": "^4.7.5",
     "sql.js": "^1.10.3",
     "whatsapp-web.js": "^1.23.0"
+  },
+  "devDependencies": {
+    "pino-pretty": "^13.1.3"
   }
 }

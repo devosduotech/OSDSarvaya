@@ -6,7 +6,7 @@ services:
         APP_VERSION: __VERSION__
     container_name: osdsarvaya-app
     ports:
-      - "3001:3001"
+      - "3201:3201"
 
     env_file:
       - production.env
@@ -24,7 +24,7 @@ services:
     stop_grace_period: 40s   # ✅ Critical for Chromium cleanup
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3201/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
