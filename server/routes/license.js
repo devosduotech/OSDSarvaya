@@ -58,13 +58,15 @@ async function setCachedValidation(licenseKey, isValid, message, customerData) {
     await db.run(
         `INSERT OR REPLACE INTO license_cache (license_key, is_valid, message, customer_email, customer_name, validated_at, expires_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        licenseKey,
-        isValid ? 1 : 0,
-        message,
-        customerData?.customer_email || null,
-        customerData?.customer || null,
-        new Date().toISOString(),
-        expiresAt.toISOString()
+        [
+            licenseKey,
+            isValid ? 1 : 0,
+            message,
+            customerData?.customer_email || null,
+            customerData?.customer || null,
+            new Date().toISOString(),
+            expiresAt.toISOString()
+        ]
     );
 }
 
@@ -119,12 +121,14 @@ router.post('/activate', async (req, res) => {
         await db.run(
             `INSERT OR REPLACE INTO licenses (license_key, customer_email, customer_name, machine_id, activated, is_active, activation_date, updated_at)
              VALUES (?, ?, ?, ?, 1, 1, ?, ?)`,
-            licenseKey,
-            email,
-            erpnextResult.customer || '',
-            machineId,
-            activationDate,
-            activationDate
+            [
+                licenseKey,
+                email,
+                erpnextResult.customer || '',
+                machineId,
+                activationDate,
+                activationDate
+            ]
         );
 
         await setCachedValidation(licenseKey, true, 'License activated', {
@@ -197,12 +201,14 @@ router.post('/validate', async (req, res) => {
         await db.run(
             `INSERT OR REPLACE INTO licenses (license_key, customer_email, customer_name, machine_id, activated, is_active, activation_date, updated_at)
              VALUES (?, ?, ?, ?, 1, 1, ?, ?)`,
-            licenseKey,
-            erpnextResult.customer_email || '',
-            erpnextResult.customer || '',
-            machineId,
-            erpnextResult.activation_date || new Date().toISOString(),
-            new Date().toISOString()
+            [
+                licenseKey,
+                erpnextResult.customer_email || '',
+                erpnextResult.customer || '',
+                machineId,
+                erpnextResult.activation_date || new Date().toISOString(),
+                new Date().toISOString()
+            ]
         );
 
         await setCachedValidation(licenseKey, true, 'License valid', {
@@ -254,13 +260,12 @@ router.post('/deactivate', async (req, res) => {
         const db = await dbPromise;
         await db.run(
             'UPDATE licenses SET machine_id = NULL, activated = 0, activation_date = NULL, updated_at = ? WHERE license_key = ?',
-            new Date().toISOString(),
-            licenseKey
+            [new Date().toISOString(), licenseKey]
         );
 
         await db.run(
             'DELETE FROM license_cache WHERE license_key = ?',
-            licenseKey
+            [licenseKey]
         );
 
         logger.info({ licenseKey }, 'License deactivated successfully');
