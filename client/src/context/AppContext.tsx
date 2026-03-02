@@ -523,7 +523,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // =========================
   const connectWhatsApp = async () => {
     console.log('CONNECT WA CLICKED via REST API');
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('osdsarvaya_token');
     if (!token) {
       console.error('No token found!');
       return;
@@ -549,7 +549,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const disconnectWhatsApp = async () => {
     console.log('DISCONNECT WA CLICKED via REST API');
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('osdsarvaya_token');
     if (!token) {
       console.error('No token found!');
       return;
@@ -572,7 +572,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const resetWhatsApp = async () => {
     console.log('RESET WA CLICKED via REST API');
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('osdsarvaya_token');
     if (!token) {
       console.error('No token found!');
       return;
