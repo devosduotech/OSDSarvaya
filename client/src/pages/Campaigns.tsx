@@ -37,8 +37,11 @@ const toISTDateInput = (date: Date) => {
 };
 
 const toISOTimeFromInput = (value: string) => {
-  const date = new Date(value);
-  return date.toISOString();
+  const [datePart, timePart] = value.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
+  const localDate = new Date(year, month - 1, day, hours, minutes);
+  return localDate.toISOString();
 };
 
 const formatDateIST = (isoString: string) => {
