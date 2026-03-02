@@ -40,14 +40,16 @@ const toISOTimeFromInput = (value: string) => {
   const [datePart, timePart] = value.split('T');
   const [year, month, day] = datePart.split('-').map(Number);
   const [hours, minutes] = timePart.split(':').map(Number);
-  const localDate = new Date(year, month - 1, day, hours, minutes);
-  return localDate.toISOString();
+  const istDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  const istTime = istDate.getTime();
+  const utcTime = istTime - IST_OFFSET;
+  return new Date(utcTime).toISOString();
 };
 
 const formatDateIST = (isoString: string) => {
   const date = new Date(isoString);
-  const istDate = new Date(date.getTime() + IST_OFFSET);
-  return istDate.toLocaleString('en-IN', {
+  return date.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
