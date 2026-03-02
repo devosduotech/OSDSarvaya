@@ -617,7 +617,7 @@ async function processRun(runId, templateId, groupIds) {
 
     const template = await db.get(
       `SELECT * FROM campaign_templates WHERE id=?`,
-      templateId
+      [templateId]
     );
 
     if (!template)
