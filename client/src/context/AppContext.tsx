@@ -537,7 +537,16 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
           Authorization: `Bearer ${token}`
         }
       });
-      const data = await res.json();
+      if (!res.ok) {
+        console.error('WhatsApp connect failed:', res.status, res.statusText);
+        return;
+      }
+      const text = await res.text();
+      if (!text) {
+        console.log('WhatsApp connect: empty response');
+        return;
+      }
+      const data = JSON.parse(text);
       console.log('WhatsApp connect response:', data);
       if (!data.success) {
         console.error('Failed to connect:', data.message);
@@ -563,7 +572,13 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
           Authorization: `Bearer ${token}`
         }
       });
-      const data = await res.json();
+      if (!res.ok) {
+        console.error('WhatsApp disconnect failed:', res.status, res.statusText);
+        return;
+      }
+      const text = await res.text();
+      if (!text) return;
+      const data = JSON.parse(text);
       console.log('WhatsApp disconnect response:', data);
     } catch (err) {
       console.error('WhatsApp disconnect error:', err);
@@ -586,7 +601,13 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
           Authorization: `Bearer ${token}`
         }
       });
-      const data = await res.json();
+      if (!res.ok) {
+        console.error('WhatsApp reset failed:', res.status, res.statusText);
+        return;
+      }
+      const text = await res.text();
+      if (!text) return;
+      const data = JSON.parse(text);
       console.log('WhatsApp reset response:', data);
     } catch (err) {
       console.error('WhatsApp reset error:', err);
