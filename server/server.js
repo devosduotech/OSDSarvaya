@@ -509,7 +509,17 @@ app.post('/api/campaigns/schedule', verifyToken, async (req, res) => {
     return res.status(400).json({ success: false, message: 'scheduledAt is required' });
   }
 
-  const scheduledTime = new Date(scheduledAt);
+  // Handle datetime-local format (YYYY-MM-DDTHH:MM) - parse as local time
+  let scheduledTime;
+  if (scheduledAt.includes('T')) {
+    const [datePart, timePart] = scheduledAt.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    scheduledTime = new Date(year, month - 1, day, hours, minutes);
+  } else {
+    scheduledTime = new Date(scheduledAt);
+  }
+  
   if (isNaN(scheduledTime.getTime())) {
     return res.status(400).json({ success: false, message: 'Invalid date format' });
   }
@@ -564,13 +574,21 @@ setInterval(async () => {
 
   try {
     const db = await dbPromise;
-    const now = new Date().toISOString();
+    const now = new Date();
 
-    const dueRuns = await db.all(
-      `SELECT id, campaignTemplateId, targetGroupIds FROM campaign_runs 
-       WHERE status = 'Scheduled' AND scheduledAt <= ?`,
-      [now]
+    // Get all scheduled campaigns and filter in JS (since stored as local time strings)
+    const allScheduled = await db.all(
+      `SELECT id, campaignTemplateId, targetGroupIds, scheduledAt FROM campaign_runs 
+       WHERE status = 'Scheduled'`
     );
+
+    const dueRuns = allScheduled.filter(run => {
+      const [datePart, timePart] = run.scheduledAt.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hours, minutes] = timePart.split(':').map(Number);
+      const scheduledTime = new Date(year, month - 1, day, hours, minutes);
+      return scheduledTime <= now;
+    });
 
     logger.info(`Scheduler found ${dueRuns.length} due campaigns`);
 

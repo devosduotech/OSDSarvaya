@@ -30,30 +30,11 @@ const isAllowedFileType = (mimeType: string) => {
 };
 
 const toLocalDateTimeInput = (date: Date) => {
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  return date.toISOString().slice(0, 16);
 };
 
-const toISOFromInput = (value: string) => {
-  // datetime-local input is already in local time, but parsed as UTC
-  // Need to add timezone offset to get correct UTC
-  const ms = Date.parse(value);
-  const localDate = new Date(ms);
-  const offset = localDate.getTimezoneOffset() * 60000;
-  const utcDate = new Date(ms + offset);
-  return utcDate.toISOString();
-};
-
-const formatLocalDateTime = (isoString: string) => {
-  const date = new Date(isoString);
-  return date.toLocaleString([], {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  });
+const formatDateTime = (dateTimeStr: string) => {
+  return dateTimeStr.replace('T', ' ').slice(0, 16);
 };
 
 const getFileTypeCategory = (mimeType: string) => {
@@ -203,16 +184,16 @@ const Campaigns: React.FC = () => {
   const handleScheduleCampaign = async () => {
     if (!templateToSend || !scheduledTime) return;
 
-    const utcTime = toISOFromInput(scheduledTime);
+    const localTime = scheduledTime;
 
     const result = await scheduleCampaign(
       templateToSend.id,
       selectedGroupIds,
-      utcTime
+      localTime
     );
 
     if (result?.success) {
-      alert(`Campaign scheduled for ${formatLocalDateTime(utcTime)}`);
+      alert(`Campaign scheduled for ${formatDateTime(localTime)}`);
       setSendModalOpen(false);
       setScheduledTime('');
     } else {
