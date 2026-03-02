@@ -266,118 +266,150 @@ async function initializeWhatsAppClient() {
 
   if (waClient) return;
 
-  try {
+  const maxRetries = 3;
+  let attempt = 0;
 
-    logger.info('Cleaning Chromium locks...');
-    cleanChromiumLocks(getSessionPath());
-    await new Promise(r => setTimeout(r, 1500));
+  async function attemptInit() {
+    attempt++;
+    logger.info(`WhatsApp initialization attempt ${attempt}/${maxRetries}`);
 
-    logger.info('Initializing WhatsApp Client...');
+    try {
 
-    const puppeteerOptions = {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu'
-      ]
-    };
+      logger.info('Cleaning Chromium locks...');
+      cleanChromiumLocks(getSessionPath());
+      await new Promise(r => setTimeout(r, 2000));
 
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    }
+      logger.info('Initializing WhatsApp Client...');
 
-    waClient = new Client({
-      authStrategy: new LocalAuth({ dataPath: getSessionPath() }),
-      puppeteer: puppeteerOptions
-    });
+      const puppeteerOptions = {
+        headless: "new",
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-site-isolation-trials',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--disable-web-security',
+          '--disable-background-networking',
+          '--disable-default-apps',
+          '--disable-extensions',
+          '--disable-sync',
+          '--disable-translate',
+          '--metrics-recording-only',
+          '--mute-audio',
+          '--no-first-run',
+          '--safebrowsing-disable-auto-update'
+        ]
+      };
 
-    waClient.on('qr', (qr) => {
-      changeStatus('SCAN_QR');
-      io.emit('qr_code', qr);
-    });
-
-    waClient.on('ready', () => {
-      logger.info(`WhatsApp READY: ${waClient.info?.wid?._serialized}`);
-      changeStatus('CONNECTED');
-      emitActivity('whatsapp', 'WhatsApp connected');
-    });
-
-    waClient.on('disconnected', (reason) => {
-      logger.info(`WhatsApp disconnected: ${reason}`);
-      changeStatus('DISCONNECTED');
-      emitActivity('whatsapp', 'WhatsApp disconnected, attempting to reconnect...');
-      
-      // Auto-reconnect after 3 seconds
-      setTimeout(async () => {
-        if (waStatus === 'DISCONNECTED') {
-          logger.info('Attempting auto-reconnect...');
-          await initializeWhatsApp();
-        }
-      }, 3000);
-    });
-
-    waClient.on('auth_failure', (msg) => {
-      logger.error({ msg }, 'WhatsApp AUTH FAILURE');
-      changeStatus('AUTH_FAILED');
-      emitActivity('whatsapp', 'WhatsApp authentication failed');
-    });
-
-    waClient.on('loading_screen', (msg) => {
-      logger.info(`WhatsApp loading: ${msg}`);
-    });
-
-    // Handle incoming messages for opt-out/opt-in
-    waClient.on('message', async (message) => {
-      if (message.fromMe) return;
-      
-      const body = message.body?.trim().toUpperCase();
-      const from = message.from;
-      
-      if (body === 'STOP' || body === 'UNSUBSCRIBE') {
-        try {
-          const db = await dbPromise;
-          const phone = from.replace('@c.us', '');
-          
-          const result = await db.run(
-            `UPDATE contacts SET optedIn = 0, optedOutAt = ? WHERE phone = ?`,
-            [new Date().toISOString(), phone]
-          );
-          
-          if (result.changes > 0) {
-            logger.info(`Contact ${phone} opted out`);
-            emitActivity('consent', `Contact ${phone} opted out`);
-          }
-        } catch (err) {
-          logger.error({ err }, 'Opt-out handling failed');
-        }
-      } else if (body === 'START' || body === 'SUBSCRIBE' || body === 'OPTIN') {
-        try {
-          const db = await dbPromise;
-          const phone = from.replace('@c.us', '');
-          
-          const result = await db.run(
-            `UPDATE contacts SET optedIn = 1, optedInAt = ? WHERE phone = ?`,
-            [new Date().toISOString(), phone]
-          );
-          
-          if (result.changes > 0) {
-            logger.info(`Contact ${phone} opted in`);
-            emitActivity('consent', `Contact ${phone} opted back in`);
-          }
-        } catch (err) {
-          logger.error({ err }, 'Opt-in handling failed');
-        }
+      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
       }
-    });
 
-    await waClient.initialize();
+      waClient = new Client({
+        authStrategy: new LocalAuth({ dataPath: getSessionPath() }),
+        puppeteer: puppeteerOptions,
+        restartOnAuthFail: true
+      });
 
-  } catch (err) {
-    logger.error({ err }, 'WA INIT ERROR');
-    changeStatus('FAILED');
+      waClient.on('qr', (qr) => {
+        changeStatus('SCAN_QR');
+        io.emit('qr_code', qr);
+      });
+
+      waClient.on('ready', () => {
+        logger.info(`WhatsApp READY: ${waClient.info?.wid?._serialized}`);
+        changeStatus('CONNECTED');
+        emitActivity('whatsapp', 'WhatsApp connected');
+      });
+
+      waClient.on('disconnected', (reason) => {
+        logger.info(`WhatsApp disconnected: ${reason}`);
+        changeStatus('DISCONNECTED');
+        emitActivity('whatsapp', 'WhatsApp disconnected, attempting to reconnect...');
+        
+        setTimeout(async () => {
+          if (waStatus === 'DISCONNECTED') {
+            logger.info('Attempting auto-reconnect...');
+            await initializeWhatsApp();
+          }
+        }, 3000);
+      });
+
+      waClient.on('auth_failure', (msg) => {
+        logger.error({ msg }, 'WhatsApp AUTH FAILURE');
+        changeStatus('AUTH_FAILED');
+        emitActivity('whatsapp', 'WhatsApp authentication failed');
+      });
+
+      waClient.on('loading_screen', (msg) => {
+        logger.info(`WhatsApp loading: ${msg}`);
+      });
+
+      waClient.on('message', async (message) => {
+        if (message.fromMe) return;
+        
+        const body = message.body?.trim().toUpperCase();
+        const from = message.from;
+        
+        if (body === 'STOP' || body === 'UNSUBSCRIBE') {
+          try {
+            const db = await dbPromise;
+            const phone = from.replace('@c.us', '');
+            
+            const result = await db.run(
+              `UPDATE contacts SET optedIn = 0, optedOutAt = ? WHERE phone = ?`,
+              [new Date().toISOString(), phone]
+            );
+            
+            if (result.changes > 0) {
+              logger.info(`Contact ${phone} opted out`);
+              emitActivity('consent', `Contact ${phone} opted out`);
+            }
+          } catch (err) {
+            logger.error({ err }, 'Opt-out handling failed');
+          }
+        } else if (body === 'START' || body === 'SUBSCRIBE' || body === 'OPTIN') {
+          try {
+            const db = await dbPromise;
+            const phone = from.replace('@c.us', '');
+            
+            const result = await db.run(
+              `UPDATE contacts SET optedIn = 1, optedInAt = ? WHERE phone = ?`,
+              [new Date().toISOString(), phone]
+            );
+            
+            if (result.changes > 0) {
+              logger.info(`Contact ${phone} opted in`);
+              emitActivity('consent', `Contact ${phone} opted back in`);
+            }
+          } catch (err) {
+            logger.error({ err }, 'Opt-in handling failed');
+          }
+        }
+      });
+
+      await waClient.initialize();
+      return true;
+
+    } catch (err) {
+      logger.error({ err, attempt }, 'WA INIT ERROR');
+      waClient = null;
+      
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 2000;
+        logger.info(`Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        return attemptInit();
+      }
+      
+      changeStatus('FAILED');
+      return false;
+    }
   }
+
+  return attemptInit();
 }
 
 
