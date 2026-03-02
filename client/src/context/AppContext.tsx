@@ -201,7 +201,6 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     fetchData();
 
     const socket = io({
-      path: '/socket.io',
       transports: ['polling'],
       auth: { token },
       reconnection: true,
