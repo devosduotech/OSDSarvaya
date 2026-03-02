@@ -111,11 +111,13 @@ const Dashboard: React.FC = () => {
   // =========================
   // ACTIVITY HELPERS
   // =========================
-const formatTime = (timestamp: string | number) => {
+const formatTime = (timestamp: string | number | undefined) => {
+  if (!timestamp) return 'Unknown';
   const date = typeof timestamp === 'string'
     ? new Date(timestamp)
     : new Date(timestamp);
 
+  if (isNaN(date.getTime())) return 'Invalid Date';
   return date.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit'
@@ -305,7 +307,7 @@ const formatTime = (timestamp: string | number) => {
                   className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600"
                 >
                   <div className="text-xs text-slate-500 dark:text-slate-400">
-                    {formatTime(act.timestamp)}
+                    {formatTime(act.timestamp || (act as any).createdAt)}
                   </div>
 
                   <div className="text-sm text-slate-700 dark:text-slate-200 mt-1">
