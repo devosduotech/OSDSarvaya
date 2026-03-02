@@ -1001,6 +1001,11 @@ io.on('connection', (socket) => {
       await waClient.destroy();
       waClient = null;
     }
+    // Clear session folder to force new QR code for different number
+    const sessionPath = getSessionPath();
+    if (fs.existsSync(sessionPath)) {
+      fs.rmSync(sessionPath, { recursive: true, force: true });
+    }
     changeStatus('DISCONNECTED');
   });
 

@@ -147,6 +147,17 @@ To send messages, connect your WhatsApp account:
 - The QR code refreshes every few seconds
 - If it expires, wait for a new one
 
+### Changing WhatsApp Number
+
+To connect a different WhatsApp number:
+
+1. Go to **Settings**
+2. Find the WhatsApp connection section
+3. Click **Disconnect** to log out from the current number
+4. Click **Connect** to scan a new QR code
+
+Your contacts, groups, campaigns, and license will be preserved.
+
 ---
 
 ## Managing Contacts

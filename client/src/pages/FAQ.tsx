@@ -112,6 +112,10 @@ const FAQ: React.FC = () => {
       answer: `Yes, your WhatsApp connection is saved. You won't need to scan the QR code again unless you explicitly disconnect from the Settings page.`
     },
     {
+      question: 'How do I connect a different WhatsApp number?',
+      answer: `Go to Settings > WhatsApp section. Click "Disconnect" to log out from the current number, then click "Connect" to scan a new QR code with the desired WhatsApp number. Your contacts, groups, and license will be preserved.`
+    },
+    {
       question: 'How can I change my admin password?',
       answer: `Go to Settings > Change Password section. Enter your current password, then enter and confirm your new password. Click Change Password to save.`
     },
