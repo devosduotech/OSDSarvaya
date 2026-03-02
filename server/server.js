@@ -483,6 +483,7 @@ app.post('/api/campaigns/schedule', verifyToken, async (req, res) => {
   }
 
   if (scheduledTime <= new Date()) {
+    logger.warn(`Schedule validation failed: scheduledTime=${scheduledTime.toISOString()}, now=${new Date().toISOString()}`);
     return res.status(400).json({ success: false, message: 'Scheduled time must be in the future' });
   }
 
@@ -497,6 +498,8 @@ app.post('/api/campaigns/schedule', verifyToken, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?)`,
       [runId, templateId, JSON.stringify(groupIds), 'Scheduled', scheduledAt, new Date().toISOString()]
     );
+
+    logger.info(`Campaign scheduled successfully: runId=${runId}, scheduledAt=${scheduledAt}`);
 
     await db.run(
       `INSERT INTO reports
