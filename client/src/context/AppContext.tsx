@@ -312,7 +312,11 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   const toggleContactOptStatus = async (id: string, optedIn: boolean) => {
     try {
       const res = await apiRequest<Contact>(`/contacts/${id}/opt-status`, 'PUT', { optedIn });
-      setContacts(c => c.map(x => x.id === res.id ? res : x));
+      if (res && res.id) {
+        setContacts(c => c.map(x => x.id === res.id ? res : x));
+        return true;
+      }
+      await fetchData();
       return true;
     } catch {
       return false;
