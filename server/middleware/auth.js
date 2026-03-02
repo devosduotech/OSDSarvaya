@@ -20,7 +20,7 @@ const verifyToken = (req, res, next) => {
 };
 
 const verifySocketToken = (socket, next) => {
-    const token = socket.handshake.auth.token;
+    const token = socket.handshake.auth?.token || socket.handshake.query?.token;
 
     if (!token) {
         logger.warn('Socket connection rejected: No token provided.');

@@ -202,7 +202,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
 
     const socket = io({
       transports: ['websocket', 'polling'],
-      auth: { token },
+      query: { token },
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000
