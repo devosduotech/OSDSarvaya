@@ -37,8 +37,9 @@ const toISTDateInput = (date: Date) => {
 };
 
 const toISOTimeFromInput = (value: string) => {
-  const date = new Date(value);
-  return new Date(date.getTime() - IST_OFFSET).toISOString();
+  const date = new Date(value + ':00');
+  const utcDate = new Date(date.getTime() - IST_OFFSET);
+  return utcDate.toISOString();
 };
 
 const formatDateIST = (isoString: string) => {
