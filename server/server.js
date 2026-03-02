@@ -520,7 +520,12 @@ app.post('/api/campaigns/schedule', verifyToken, async (req, res) => {
 // SCHEDULER - Check for scheduled campaigns every 30 seconds
 // =====================================================
 setInterval(async () => {
-  if (isCampaignRunning || waStatus !== 'CONNECTED') return;
+  logger.info(`Scheduler check: isCampaignRunning=${isCampaignRunning}, waStatus=${waStatus}`);
+  
+  if (isCampaignRunning || waStatus !== 'CONNECTED') {
+    logger.info('Scheduler skipped: campaign running or WhatsApp not connected');
+    return;
+  }
 
   try {
     const db = await dbPromise;
@@ -531,6 +536,8 @@ setInterval(async () => {
        WHERE status = 'Scheduled' AND scheduledAt <= ?`,
       [now]
     );
+
+    logger.info(`Scheduler found ${dueRuns.length} due campaigns`);
 
     for (const run of dueRuns) {
       logger.info(`Starting scheduled campaign: ${run.id}`);
