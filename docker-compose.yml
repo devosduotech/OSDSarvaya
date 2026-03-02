@@ -3,7 +3,7 @@ services:
     build:
       context: .
       args:
-        APP_VERSION: ${APP_VERSION:-1.1.16}
+        APP_VERSION: ${APP_VERSION:-1.1.21}
     container_name: osdsarvaya-app
     ports:
       - "3001:3001"
@@ -12,7 +12,7 @@ services:
       - production.env
 
     environment:
-      - APP_VERSION=${APP_VERSION:-1.1.16}
+      - APP_VERSION=${APP_VERSION:-1.1.21}
       - TZ=Asia/Kolkata
 
     volumes:
