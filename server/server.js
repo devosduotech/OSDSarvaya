@@ -342,8 +342,7 @@ async function initializeWhatsAppClient() {
           
           const result = await db.run(
             `UPDATE contacts SET optedIn = 0, optedOutAt = ? WHERE phone = ?`,
-            new Date().toISOString(),
-            phone
+            [new Date().toISOString(), phone]
           );
           
           if (result.changes > 0) {
@@ -360,8 +359,7 @@ async function initializeWhatsAppClient() {
           
           const result = await db.run(
             `UPDATE contacts SET optedIn = 1, optedInAt = ? WHERE phone = ?`,
-            new Date().toISOString(),
-            phone
+            [new Date().toISOString(), phone]
           );
           
           if (result.changes > 0) {
@@ -413,20 +411,14 @@ app.post('/api/campaigns/start', verifyToken, async (req, res) => {
         `INSERT INTO campaign_runs
          (id, campaignTemplateId, targetGroupIds, status, queuePosition, createdAt)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        runId,
-        templateId,
-        JSON.stringify(groupIds),
-        'Queued',
-        queuePosition,
-        new Date().toISOString()
+        [runId, templateId, JSON.stringify(groupIds), 'Queued', queuePosition, new Date().toISOString()]
       );
 
       await db.run(
         `INSERT INTO reports
          (campaignRunId, totalContacts, sent, failed, delivered, read, progress)
          VALUES (?, ?, 0, 0, 0, 0, 0)`,
-        runId,
-        0
+        [runId, 0]
       );
 
       emitActivity('campaign_queued', `Campaign queued at position ${queuePosition}`, { runId });
@@ -447,19 +439,14 @@ app.post('/api/campaigns/start', verifyToken, async (req, res) => {
       `INSERT INTO campaign_runs
        (id, campaignTemplateId, targetGroupIds, status, createdAt)
        VALUES (?, ?, ?, ?, ?)`,
-      runId,
-      templateId,
-      JSON.stringify(groupIds),
-      'Sending',
-      new Date().toISOString()
+      [runId, templateId, JSON.stringify(groupIds), 'Sending', new Date().toISOString()]
     );
 
     await db.run(
       `INSERT INTO reports
        (campaignRunId, totalContacts, sent, failed, delivered, read, progress)
        VALUES (?, ?, 0, 0, 0, 0, 0)`,
-      runId,
-      0
+      [runId, 0]
     );
 
     isCampaignRunning = true;
@@ -508,20 +495,14 @@ app.post('/api/campaigns/schedule', verifyToken, async (req, res) => {
       `INSERT INTO campaign_runs
        (id, campaignTemplateId, targetGroupIds, status, scheduledAt, createdAt)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      runId,
-      templateId,
-      JSON.stringify(groupIds),
-      'Scheduled',
-      scheduledAt,
-      new Date().toISOString()
+      [runId, templateId, JSON.stringify(groupIds), 'Scheduled', scheduledAt, new Date().toISOString()]
     );
 
     await db.run(
       `INSERT INTO reports
        (campaignRunId, totalContacts, sent, failed, delivered, read, progress)
        VALUES (?, ?, 0, 0, 0, 0, 0)`,
-      runId,
-      0
+      [runId, 0]
     );
 
     emitActivity('campaign_scheduled', `Campaign scheduled for ${scheduledTime.toLocaleString()}`, { runId });
@@ -721,8 +702,7 @@ async function processRun(runId, templateId, groupIds) {
 
     await db.run(
       `UPDATE reports SET totalContacts=? WHERE campaignRunId=?`,
-      contacts.length,
-      runId
+      [contacts.length, runId]
     );
 
     for (const contact of contacts) {
@@ -813,10 +793,7 @@ async function processRun(runId, templateId, groupIds) {
         `UPDATE reports
          SET sent=?, failed=?, progress=?
          WHERE campaignRunId=?`,
-        sent,
-        failed,
-        progress,
-        runId
+        [sent, failed, progress, runId]
       );
 
       io.emit('campaign_progress', { runId, sent, failed, progress });
@@ -912,9 +889,7 @@ async function processRun(runId, templateId, groupIds) {
       const finalReport = await db.get(`SELECT * FROM reports WHERE campaignRunId=?`, runId);
       await db.run(
         `UPDATE reports SET sent=?, failed=? WHERE campaignRunId=?`,
-        sent,
-        failed,
-        runId
+        [sent, failed, runId]
       );
       
       logger.info(`Retry complete: ${sent} sent, ${failed} failed`);

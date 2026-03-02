@@ -136,11 +136,9 @@ router.post('/contacts/bulk', async (req, res) => {
     
     const stmt = await db.prepare("INSERT INTO contacts (id, name, phone, email, tags) VALUES (?, ?, ?, ?, ?)");
     try {
-        await db.run('BEGIN TRANSACTION');
         for (const c of validContacts) {
-            await stmt.run(c.id, c.name, c.phone, c.email || '', c.tags || '');
+            await stmt.run([c.id, c.name, c.phone, c.email || '', c.tags || '']);
         }
-        await db.run('COMMIT');
         
         const totalSkipped = invalidPhones.length + duplicates.length;
         res.status(201).json({ 
@@ -151,7 +149,6 @@ router.post('/contacts/bulk', async (req, res) => {
             duplicates: duplicates.length
         });
     } catch (err) {
-        await db.run('ROLLBACK');
         logger.error({ err }, "Failed to bulk import contacts");
         res.status(500).json({ message: 'Error importing contacts.' });
     } finally {
@@ -182,7 +179,7 @@ router.put('/contacts/:id', async (req, res) => {
 router.delete('/contacts/:id', async (req, res) => {
     try {
         const db = await dbPromise;
-        await db.run("DELETE FROM contacts WHERE id = ?", req.params.id);
+        await db.run("DELETE FROM contacts WHERE id = ?", [req.params.id]);
         res.status(204).send();
     } catch (err) { logger.error({ err }, "Failed to delete contact"); res.status(500).json({ message: "Error deleting contact" }); }
 });
@@ -197,14 +194,12 @@ router.put('/contacts/:id/opt-status', async (req, res) => {
         if (optedIn) {
             await db.run(
                 "UPDATE contacts SET optedIn = 1, optedInAt = ? WHERE id = ?",
-                now,
-                req.params.id
+                [now, req.params.id]
             );
         } else {
             await db.run(
                 "UPDATE contacts SET optedIn = 0, optedOutAt = ? WHERE id = ?",
-                now,
-                req.params.id
+                [now, req.params.id]
             );
         }
         
@@ -226,12 +221,12 @@ router.put('/contacts/bulk/opt-status', async (req, res) => {
         if (optedIn) {
             await db.run(
                 `UPDATE contacts SET optedIn = 1, optedInAt = ? WHERE id IN (${contactIds.map(() => '?').join(',')})`,
-                now, ...contactIds
+                [now, ...contactIds]
             );
         } else {
             await db.run(
                 `UPDATE contacts SET optedIn = 0, optedOutAt = ? WHERE id IN (${contactIds.map(() => '?').join(',')})`,
-                now, ...contactIds
+                [now, ...contactIds]
             );
         }
         
@@ -252,7 +247,6 @@ router.post('/groups', async (req, res) => {
     
     const db = await dbPromise;
     try {
-        await db.run('BEGIN TRANSACTION');
         await db.run("INSERT INTO groups (id, name) VALUES (?, ?)", [id, name.trim()]);
         
         // Insert each contact
@@ -260,9 +254,8 @@ router.post('/groups', async (req, res) => {
             await db.run("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)", [id, contactId]);
         }
         
-        await db.run('COMMIT');
         res.status(201).json({ id, name, contactIds });
-    } catch (err) { await db.run('ROLLBACK'); logger.error({ err }, "Failed to create group"); res.status(500).json({ message: "Error creating group" }); }
+    } catch (err) { logger.error({ err }, "Failed to create group"); res.status(500).json({ message: "Error creating group" }); }
 });
 
 router.put('/groups/:id', async (req, res) => {
@@ -275,7 +268,6 @@ router.put('/groups/:id', async (req, res) => {
     
     const db = await dbPromise;
     try {
-        await db.run('BEGIN TRANSACTION');
         await db.run("UPDATE groups SET name = ? WHERE id = ?", [name.trim(), groupId]);
         await db.run("DELETE FROM group_contacts WHERE group_id = ?", [groupId]);
         
@@ -284,15 +276,14 @@ router.put('/groups/:id', async (req, res) => {
             await db.run("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)", [groupId, contactId]);
         }
         
-        await db.run('COMMIT');
         res.json({ id: groupId, name, contactIds });
-    } catch (err) { await db.run('ROLLBACK'); logger.error({ err }, "Failed to update group"); res.status(500).json({ message: "Error updating group" }); }
+    } catch (err) { logger.error({ err }, "Failed to update group"); res.status(500).json({ message: "Error updating group" }); }
 });
 
 router.delete('/groups/:id', async (req, res) => {
     try {
         const db = await dbPromise;
-        await db.run("DELETE FROM groups WHERE id = ?", req.params.id);
+        await db.run("DELETE FROM groups WHERE id = ?", [req.params.id]);
         res.status(204).send();
     } catch (err) { logger.error({ err }, "Failed to delete group"); res.status(500).json({ message: "Error deleting group" }); }
 });
@@ -331,7 +322,7 @@ router.put('/templates/:id', async (req, res) => {
 router.delete('/templates/:id', async (req, res) => {
     try {
         const db = await dbPromise;
-        await db.run("DELETE FROM campaign_templates WHERE id = ?", req.params.id);
+        await db.run("DELETE FROM campaign_templates WHERE id = ?", [req.params.id]);
         res.status(204).send();
     } catch (err) { logger.error({ err }, "Failed to delete template"); res.status(500).json({ message: "Error deleting template" }); }
 });
@@ -341,7 +332,7 @@ router.put('/settings', async (req, res) => {
     const { messagesPerHour } = req.body;
     try {
         const db = await dbPromise;
-        await db.run("UPDATE settings SET value = ? WHERE key = 'messagesPerHour'", messagesPerHour);
+        await db.run("UPDATE settings SET value = ? WHERE key = 'messagesPerHour'", [messagesPerHour]);
         res.json({ messagesPerHour });
     } catch (err) { logger.error({ err }, "Failed to update settings"); res.status(500).json({ message: "Error updating settings" }); }
 });
@@ -363,7 +354,6 @@ router.post('/backup', async (req, res) => {
     const { contacts, groups, templates, runs, reports, settings, group_contacts } = req.body;
     const db = await dbPromise;
     try {
-        await db.run('BEGIN TRANSACTION');
         // Clear all data
         await Promise.all(['group_contacts', 'contacts', 'groups', 'reports', 'campaign_runs', 'campaign_templates', 'settings'].map(t => db.run(`DELETE FROM ${t}`)));
 
@@ -378,19 +368,17 @@ router.post('/backup', async (req, res) => {
             group_contact: await db.prepare("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)")
         };
 
-        for (const c of contacts) await statements.contact.run(c.id, c.name, c.phone, c.email, c.tags);
-        for (const g of groups) await statements.group.run(g.id, g.name);
-        for (const t of templates) await statements.template.run(t.id, t.name, t.message, t.attachment, t.createdAt);
-        for (const r of runs) await statements.run.run(r.id, r.campaignTemplateId, r.targetGroupIds, r.status, r.createdAt);
-        for (const r of reports) await statements.report.run(r.campaignRunId, r.totalContacts, r.sent, r.delivered, r.read, r.failed, r.progress);
-        for (const s of settings) await statements.setting.run(s.key, s.value);
-        for (const gc of group_contacts) await statements.group_contact.run(gc.group_id, gc.contact_id);
+        for (const c of contacts) await statements.contact.run([c.id, c.name, c.phone, c.email, c.tags]);
+        for (const g of groups) await statements.group.run([g.id, g.name]);
+        for (const t of templates) await statements.template.run([t.id, t.name, t.message, t.attachment, t.createdAt]);
+        for (const r of runs) await statements.run.run([r.id, r.campaignTemplateId, r.targetGroupIds, r.status, r.createdAt]);
+        for (const r of reports) await statements.report.run([r.campaignRunId, r.totalContacts, r.sent, r.delivered, r.read, r.failed, r.progress]);
+        for (const s of settings) await statements.setting.run([s.key, s.value]);
+        for (const gc of group_contacts) await statements.group_contact.run([gc.group_id, gc.contact_id]);
 
         await Promise.all(Object.values(statements).map(s => s.finalize()));
-        await db.run('COMMIT');
         res.status(200).json({ message: 'Restore successful.' });
     } catch (err) {
-        await db.run('ROLLBACK');
         logger.error({ err }, "Restore failed");
         res.status(500).json({ message: 'Error restoring from backup.' });
     }
