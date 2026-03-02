@@ -804,7 +804,7 @@ async function processRun(runId, templateId, groupIds) {
         
         await db.run(
           `UPDATE campaign_runs SET status='Stopped' WHERE id=?`,
-          runId
+          [runId]
         );
 
         emitActivity('campaign_stopped', 'Campaign stopped by user', { runId, sent, failed });
