@@ -991,9 +991,18 @@ io.on('connection', (socket) => {
   socket.emit('status_change', waStatus);
 
   socket.on('connect_wa', async () => {
-    if (waStatus !== 'DISCONNECTED') return;
+    logger.info(`connect_wa received, current waStatus: ${waStatus}, waClient exists: ${!!waClient}`);
+    if (waClient) {
+      logger.info('WhatsApp client already exists, skipping init');
+      return;
+    }
     changeStatus('CONNECTING');
-    await initializeWhatsAppClient();
+    try {
+      await initializeWhatsAppClient();
+    } catch (err) {
+      logger.error({ err }, 'Failed to initialize WhatsApp');
+      changeStatus('FAILED');
+    }
   });
 
   socket.on('disconnect_wa', async () => {

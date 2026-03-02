@@ -3,7 +3,7 @@ services:
     build:
       context: .
       args:
-        APP_VERSION: ${APP_VERSION:-1.1.11}
+        APP_VERSION: ${APP_VERSION:-1.1.12}
     container_name: osdsarvaya-app
     ports:
       - "3001:3001"
@@ -12,7 +12,8 @@ services:
       - production.env
 
     environment:
-      - APP_VERSION=${APP_VERSION:-1.1.11}
+      - APP_VERSION=${APP_VERSION:-1.1.12}
+      - TZ=Asia/Kolkata
 
     volumes:
       - ./osdsarvaya_session:/app/server/.wwebjs_auth

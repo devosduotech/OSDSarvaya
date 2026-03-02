@@ -34,7 +34,12 @@ const toLocalDateTimeInput = (date: Date) => {
 };
 
 const toISOFromInput = (value: string) => {
-  return new Date(value).toISOString();
+  const [datePart, timePart] = value.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
+  const localDate = new Date(year, month - 1, day, hours, minutes);
+  const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000);
+  return utcDate.toISOString();
 };
 
 const formatLocalDateTime = (isoString: string) => {
