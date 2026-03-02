@@ -660,7 +660,7 @@ async function processRun(runId, templateId, groupIds) {
          ON c.id = gc.contact_Id
        WHERE gc.group_Id IN (${groupIdsArray.map(() => '?').join(',')})
        AND (c.optedIn IS NULL OR c.optedIn = 1)`,
-      ...groupIdsArray
+      groupIdsArray
     );
 
     logger.info(`Contacts loaded: ${contacts.length}`);
