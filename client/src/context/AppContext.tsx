@@ -524,6 +524,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   const connectWhatsApp = async () => {
     console.log('CONNECT WA CLICKED via REST API');
     const token = localStorage.getItem('osdsarvaya_token');
+    console.log('Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'NULL');
     if (!token) {
       console.error('No token found!');
       return;
