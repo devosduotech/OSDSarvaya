@@ -2,13 +2,18 @@ const fs = require('fs');
 const path = require('path');
 
 function getVersion() {
-  // Try to read from client-package.json (copied during build)
+  // Priority 1: Environment variable (set in Docker or packaged app)
+  if (process.env.APP_VERSION) {
+    return process.env.APP_VERSION;
+  }
+  
+  // Priority 2: Read from client-package.json (copied during build)
   const buildPackageJson = path.join(__dirname, 'client-package.json');
   
-  // Try to read from package.json in the same directory (for development)
+  // Priority 3: Read from package.json in the same directory
   const localPackageJson = path.join(__dirname, 'package.json');
   
-  // Try to read from client/package.json (development)
+  // Priority 4: Read from client/package.json (development)
   const clientPackageJson = path.join(__dirname, '..', 'client', 'package.json');
   
   let packageJsonPath = null;
