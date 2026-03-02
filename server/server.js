@@ -524,8 +524,12 @@ app.post('/api/campaigns/schedule', verifyToken, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid date format' });
   }
 
-  if (scheduledTime <= new Date()) {
-    logger.warn(`Schedule validation failed: scheduledTime=${scheduledTime.toISOString()}, now=${new Date().toISOString()}`);
+  // Convert to UTC for comparison
+  const scheduledTimeUTC = new Date(scheduledTime.getTime() + (5.5 * 60 * 60 * 1000));
+  const nowUTC = new Date();
+
+  if (scheduledTimeUTC <= nowUTC) {
+    logger.warn(`Schedule validation failed: scheduledTime=${scheduledTimeUTC.toISOString()}, now=${nowUTC.toISOString()}`);
     return res.status(400).json({ success: false, message: 'Scheduled time must be in the future' });
   }
 
