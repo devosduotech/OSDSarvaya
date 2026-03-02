@@ -36,13 +36,9 @@ const toISTDateInput = (date: Date) => {
 };
 
 const toISOTimeFromInput = (value: string) => {
-  const [datePart, timePart] = value.split('T');
-  const [year, month, day] = datePart.split('-').map(Number);
-  const [hours, minutes] = timePart.split(':').map(Number);
-  const istDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
-  const istTime = istDate.getTime();
-  const utcTime = istTime - IST_OFFSET;
-  return new Date(utcTime).toISOString();
+  const istDateStr = value + ':00+05:30';
+  const istDate = new Date(istDateStr);
+  return istDate.toISOString();
 };
 
 const formatDateIST = (isoString: string) => {

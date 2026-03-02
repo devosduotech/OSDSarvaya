@@ -87,12 +87,6 @@ OSDSarvaya requires a valid license to operate.
 3. Enter the **Email Address** associated with your license
 4. Click **Activate License**
 
-### Demo License
-
-For testing purposes, you can use:
-- **License Key**: `OSDS-8C3T-3GY3-UXYH`
-- **Email**: `info@osduotech.com`
-
 ### Important Notes
 
 - The license is tied to your machine (machine ID)
@@ -147,7 +141,7 @@ To send messages, connect your WhatsApp account:
 - The QR code refreshes every few seconds
 - If it expires, wait for a new one
 
-### Changing WhatsApp Number
+### Changing WhatsApp Number - Future Plan
 
 To connect a different WhatsApp number:
 
@@ -264,7 +258,7 @@ Thank you for your interest in our services!
 3. Select one or more target groups
 4. Click **Send Now**
 
-### Schedule for Later
+### Schedule for Later - Work In Progress
 
 1. Find your saved template in the Campaigns list
 2. Click the **Send** button
