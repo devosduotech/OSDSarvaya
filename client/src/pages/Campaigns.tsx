@@ -32,8 +32,7 @@ const isAllowedFileType = (mimeType: string) => {
 const IST_OFFSET = 5.5 * 60 * 60 * 1000;
 
 const toISTDateInput = (date: Date) => {
-  const istDate = new Date(date.getTime() + IST_OFFSET);
-  return istDate.toISOString().slice(0, 16);
+  return date.toISOString().slice(0, 16);
 };
 
 const toISOTimeFromInput = (value: string) => {
