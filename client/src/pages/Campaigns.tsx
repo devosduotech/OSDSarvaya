@@ -30,21 +30,30 @@ const isAllowedFileType = (mimeType: string) => {
 };
 
 const toLocalDateTimeInput = (date: Date) => {
-  return date.toISOString().slice(0, 16);
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 };
 
 const toISOFromInput = (value: string) => {
-  const [datePart, timePart] = value.split('T');
-  const [year, month, day] = datePart.split('-').map(Number);
-  const [hours, minutes] = timePart.split(':').map(Number);
-  const localDate = new Date(year, month - 1, day, hours, minutes);
-  const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000);
+  // datetime-local input is already in local time, but parsed as UTC
+  // Need to add timezone offset to get correct UTC
+  const ms = Date.parse(value);
+  const localDate = new Date(ms);
+  const offset = localDate.getTimezoneOffset() * 60000;
+  const utcDate = new Date(ms + offset);
   return utcDate.toISOString();
 };
 
 const formatLocalDateTime = (isoString: string) => {
   const date = new Date(isoString);
-  return date.toLocaleString();
+  return date.toLocaleString([], {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
 };
 
 const getFileTypeCategory = (mimeType: string) => {

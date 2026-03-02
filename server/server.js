@@ -987,6 +987,7 @@ async function processRun(runId, templateId, groupIds) {
 io.use(verifySocketToken);
 
 io.on('connection', (socket) => {
+  logger.info(`Socket connected: ${socket.id}, token: ${socket.handshake.auth.token ? 'present' : 'missing'}`);
 
   socket.emit('status_change', waStatus);
 

@@ -202,9 +202,11 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
 
     const socket = io({
       path: '/socket.io',
-      transports: ['polling', 'websocket'],
+      transports: ['polling'],
       auth: { token },
-      reconnection: true
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
     });
 
     socketRef.current = socket;
@@ -215,6 +217,22 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
 
     socket.on('connect_error', (err) => {
       console.error('❌ Socket error:', err.message);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('❌ Socket disconnected:', reason);
+    });
+
+    socket.io.on('reconnect', (attempt) => {
+      console.log('✅ Socket reconnected after', attempt, 'attempts');
+    });
+
+    socket.io.on('reconnect_attempt', (attempt) => {
+      console.log('🔄 Socket reconnect attempt:', attempt);
+    });
+
+    socket.io.on('reconnect_error', (err) => {
+      console.error('❌ Socket reconnect error:', err.message);
     });
 
     socket.on('qr_code', qr => {
