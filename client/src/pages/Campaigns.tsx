@@ -29,27 +29,17 @@ const isAllowedFileType = (mimeType: string) => {
   return ALLOWED_MIME_TYPES.includes(mimeType);
 };
 
-const toISTDateInput = (date: Date) => {
+const toLocalDateTimeInput = (date: Date) => {
   return date.toISOString().slice(0, 16);
 };
 
-const toISOTimeFromInput = (value: string) => {
-  const istDateStr = value + ':00+05:30';
-  const istDate = new Date(istDateStr);
-  return istDate.toISOString();
+const toISOFromInput = (value: string) => {
+  return new Date(value).toISOString();
 };
 
-const formatDateIST = (isoString: string) => {
+const formatLocalDateTime = (isoString: string) => {
   const date = new Date(isoString);
-  return date.toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
+  return date.toLocaleString();
 };
 
 const getFileTypeCategory = (mimeType: string) => {
@@ -199,7 +189,7 @@ const Campaigns: React.FC = () => {
   const handleScheduleCampaign = async () => {
     if (!templateToSend || !scheduledTime) return;
 
-    const utcTime = toISOTimeFromInput(scheduledTime);
+    const utcTime = toISOFromInput(scheduledTime);
 
     const result = await scheduleCampaign(
       templateToSend.id,
@@ -208,7 +198,7 @@ const Campaigns: React.FC = () => {
     );
 
     if (result?.success) {
-      alert(`Campaign scheduled for ${formatDateIST(utcTime)}`);
+      alert(`Campaign scheduled for ${formatLocalDateTime(utcTime)}`);
       setSendModalOpen(false);
       setScheduledTime('');
     } else {
@@ -458,7 +448,7 @@ const Campaigns: React.FC = () => {
                     if (e.target.checked) {
                       const now = new Date();
                       now.setHours(now.getHours() + 1);
-                      setScheduledTime(toISTDateInput(now));
+                      setScheduledTime(toLocalDateTimeInput(now));
                     } else {
                       setScheduledTime('');
                     }
@@ -473,7 +463,7 @@ const Campaigns: React.FC = () => {
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
                   className="w-full p-2 border rounded dark:bg-slate-600 dark:border-slate-500 dark:text-white"
-                  min={toISTDateInput(new Date())}
+                  min={toLocalDateTimeInput(new Date())}
                 />
               )}
             </div>
