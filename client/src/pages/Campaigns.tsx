@@ -29,8 +29,6 @@ const isAllowedFileType = (mimeType: string) => {
   return ALLOWED_MIME_TYPES.includes(mimeType);
 };
 
-const IST_OFFSET = 5.5 * 60 * 60 * 1000;
-
 const toISTDateInput = (date: Date) => {
   return date.toISOString().slice(0, 16);
 };
