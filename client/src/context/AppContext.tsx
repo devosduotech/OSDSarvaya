@@ -202,7 +202,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
 
     const socket = io({
       path: '/socket.io',
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       auth: { token },
       reconnection: true
     });
@@ -494,7 +494,11 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // BUTTON ACTIONS (FIXED)
   // =========================
   const connectWhatsApp = () => {
-    console.log('CONNECT WA CLICKED');
+    console.log('CONNECT WA CLICKED, socket:', socketRef.current?.connected);
+    if (!socketRef.current?.connected) {
+      console.error('Socket not connected!');
+      return;
+    }
     socketRef.current?.emit('connect_wa');
   };
 
