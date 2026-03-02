@@ -200,26 +200,37 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
 
     fetchData();
 
+    console.log('Creating socket connection...');
     const socket = io({
       transports: ['websocket', 'polling'],
       query: { token },
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      forceNew: true
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
       console.log('✅ Socket connected:', socket.id);
+      console.log('Socket transport:', socket.io.engine.transport.name);
     });
 
     socket.on('connect_error', (err) => {
-      console.error('❌ Socket error:', err.message);
+      console.error('❌ Socket connection error:', err.message);
     });
 
     socket.on('disconnect', (reason) => {
       console.log('❌ Socket disconnected:', reason);
+    });
+
+    socket.io.on('reconnect', (attempt) => {
+      console.log('✅ Socket reconnected after', attempt, 'attempts');
+    });
+
+    socket.io.on('reconnect_attempt', (attempt) => {
+      console.log('🔄 Socket reconnect attempt:', attempt);
     });
 
     socket.io.on('reconnect', (attempt) => {
