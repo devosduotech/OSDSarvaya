@@ -529,7 +529,7 @@ app.post('/api/campaigns/schedule', verifyToken, async (req, res) => {
   const nowUTC = new Date();
 
   if (scheduledTimeUTC <= nowUTC) {
-    logger.warn(`Schedule validation failed: scheduledTime=${scheduledTimeUTC.toISOString()}, now=${nowUTC.toISOString()}`);
+    logger.warn(`Schedule validation failed: scheduledTime=${scheduledTime.toString()}, now=${new Date().toString()}`);
     return res.status(400).json({ success: false, message: 'Scheduled time must be in the future' });
   }
 
