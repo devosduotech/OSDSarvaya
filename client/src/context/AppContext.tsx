@@ -519,25 +519,78 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   // =========================
-  // BUTTON ACTIONS (FIXED)
+  // BUTTON ACTIONS (REST API)
   // =========================
-  const connectWhatsApp = () => {
-    console.log('CONNECT WA CLICKED, socket:', socketRef.current?.connected);
-    if (!socketRef.current?.connected) {
-      console.error('Socket not connected!');
+  const connectWhatsApp = async () => {
+    console.log('CONNECT WA CLICKED via REST API');
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found!');
       return;
     }
-    socketRef.current?.emit('connect_wa');
+    
+    try {
+      const res = await fetch('/api/whatsapp/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      console.log('WhatsApp connect response:', data);
+      if (!data.success) {
+        console.error('Failed to connect:', data.message);
+      }
+    } catch (err) {
+      console.error('WhatsApp connect error:', err);
+    }
   };
 
-  const disconnectWhatsApp = () => {
-    console.log('DISCONNECT WA CLICKED');
-    socketRef.current?.emit('disconnect_wa');
+  const disconnectWhatsApp = async () => {
+    console.log('DISCONNECT WA CLICKED via REST API');
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found!');
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/whatsapp/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      console.log('WhatsApp disconnect response:', data);
+    } catch (err) {
+      console.error('WhatsApp disconnect error:', err);
+    }
   };
 
-  const resetWhatsApp = () => {
-    console.log('RESET WA CLICKED');
-    socketRef.current?.emit('reset_wa');
+  const resetWhatsApp = async () => {
+    console.log('RESET WA CLICKED via REST API');
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found!');
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/whatsapp/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      console.log('WhatsApp reset response:', data);
+    } catch (err) {
+      console.error('WhatsApp reset error:', err);
+    }
   };
 
   const value = {

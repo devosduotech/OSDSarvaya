@@ -1006,6 +1006,40 @@ async function processRun(runId, templateId, groupIds) {
 // =====================================================
 // SOCKET
 // =====================================================
+
+// REST API fallback for WhatsApp connection (more reliable on Windows)
+app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
+  logger.info(`WhatsApp connect API called, waStatus: ${waStatus}, waClient exists: ${!!waClient}`);
+  
+  if (waClient) {
+    return res.json({ success: true, status: waStatus, message: 'WhatsApp already connected' });
+  }
+  
+  changeStatus('CONNECTING');
+  
+  try {
+    await initializeWhatsAppClient();
+    return res.json({ success: true, status: waStatus });
+  } catch (err) {
+    logger.error({ err }, 'WhatsApp connect failed');
+    changeStatus('FAILED');
+    return res.status(500).json({ success: false, message: 'Failed to connect WhatsApp' });
+  }
+});
+
+app.post('/api/whatsapp/disconnect', verifyToken, async (req, res) => {
+  if (waClient) {
+    await waClient.destroy();
+    waClient = null;
+  }
+  const sessionPath = getSessionPath();
+  if (fs.existsSync(sessionPath)) {
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+  }
+  changeStatus('DISCONNECTED');
+  res.json({ success: true });
+});
+
 io.use(verifySocketToken);
 
 io.on('connection', (socket) => {
