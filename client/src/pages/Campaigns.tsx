@@ -29,6 +29,31 @@ const isAllowedFileType = (mimeType: string) => {
   return ALLOWED_MIME_TYPES.includes(mimeType);
 };
 
+const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+
+const toISTDateInput = (date: Date) => {
+  const istDate = new Date(date.getTime() + IST_OFFSET);
+  return istDate.toISOString().slice(0, 16);
+};
+
+const toISOTimeFromInput = (value: string) => {
+  const date = new Date(value);
+  return new Date(date.getTime() - IST_OFFSET).toISOString();
+};
+
+const formatDateIST = (isoString: string) => {
+  const date = new Date(isoString);
+  const istDate = new Date(date.getTime() + IST_OFFSET);
+  return istDate.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+};
+
 const getFileTypeCategory = (mimeType: string) => {
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
@@ -176,17 +201,16 @@ const Campaigns: React.FC = () => {
   const handleScheduleCampaign = async () => {
     if (!templateToSend || !scheduledTime) return;
 
-    const scheduledDate = new Date(scheduledTime);
-    const localISOTime = new Date(scheduledDate.getTime() - scheduledDate.getTimezoneOffset() * 60000).toISOString();
+    const utcTime = toISOTimeFromInput(scheduledTime);
 
     const result = await scheduleCampaign(
       templateToSend.id,
       selectedGroupIds,
-      localISOTime
+      utcTime
     );
 
     if (result?.success) {
-      alert(`Campaign scheduled for ${new Date(localISOTime).toLocaleString()}`);
+      alert(`Campaign scheduled for ${formatDateIST(utcTime)}`);
       setSendModalOpen(false);
       setScheduledTime('');
     } else {
@@ -434,10 +458,9 @@ const Campaigns: React.FC = () => {
                   checked={!!scheduledTime}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      // Set default to 1 hour from now
                       const now = new Date();
                       now.setHours(now.getHours() + 1);
-                      setScheduledTime(now.toISOString().slice(0, 16));
+                      setScheduledTime(toISTDateInput(now));
                     } else {
                       setScheduledTime('');
                     }
@@ -452,7 +475,7 @@ const Campaigns: React.FC = () => {
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
                   className="w-full p-2 border rounded dark:bg-slate-600 dark:border-slate-500 dark:text-white"
-                  min={new Date().toISOString().slice(0, 16)}
+                  min={toISTDateInput(new Date())}
                 />
               )}
             </div>
