@@ -244,34 +244,46 @@ router.put('/contacts/bulk/opt-status', async (req, res) => {
 
 // GROUPS
 router.post('/groups', async (req, res) => {
-    const { id, name, contactIds } = req.body;
+    const { id, name, contactIds = [] } = req.body;
+    
+    if (!name || !name.trim()) {
+        return res.status(400).json({ message: "Group name is required" });
+    }
+    
     const db = await dbPromise;
     try {
         await db.run('BEGIN TRANSACTION');
-        await db.run("INSERT INTO groups (id, name) VALUES (?, ?)", [id, name]);
-        const stmt = await db.prepare("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)");
+        await db.run("INSERT INTO groups (id, name) VALUES (?, ?)", [id, name.trim()]);
+        
+        // Insert each contact
         for (const contactId of contactIds) {
-            await stmt.run(id, contactId);
+            await db.run("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)", [id, contactId]);
         }
-        await stmt.finalize();
+        
         await db.run('COMMIT');
         res.status(201).json({ id, name, contactIds });
     } catch (err) { await db.run('ROLLBACK'); logger.error({ err }, "Failed to create group"); res.status(500).json({ message: "Error creating group" }); }
 });
 
 router.put('/groups/:id', async (req, res) => {
-    const { name, contactIds } = req.body;
+    const { name, contactIds = [] } = req.body;
     const groupId = req.params.id;
+    
+    if (!name || !name.trim()) {
+        return res.status(400).json({ message: "Group name is required" });
+    }
+    
     const db = await dbPromise;
     try {
         await db.run('BEGIN TRANSACTION');
-        await db.run("UPDATE groups SET name = ? WHERE id = ?", [name, groupId]);
+        await db.run("UPDATE groups SET name = ? WHERE id = ?", [name.trim(), groupId]);
         await db.run("DELETE FROM group_contacts WHERE group_id = ?", [groupId]);
-        const stmt = await db.prepare("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)");
+        
+        // Insert each contact
         for (const contactId of contactIds) {
-            await stmt.run(groupId, contactId);
+            await db.run("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)", [groupId, contactId]);
         }
-        await stmt.finalize();
+        
         await db.run('COMMIT');
         res.json({ id: groupId, name, contactIds });
     } catch (err) { await db.run('ROLLBACK'); logger.error({ err }, "Failed to update group"); res.status(500).json({ message: "Error updating group" }); }
