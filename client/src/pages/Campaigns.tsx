@@ -176,14 +176,17 @@ const Campaigns: React.FC = () => {
   const handleScheduleCampaign = async () => {
     if (!templateToSend || !scheduledTime) return;
 
+    const scheduledDate = new Date(scheduledTime);
+    const localISOTime = new Date(scheduledDate.getTime() - scheduledDate.getTimezoneOffset() * 60000).toISOString();
+
     const result = await scheduleCampaign(
       templateToSend.id,
       selectedGroupIds,
-      scheduledTime
+      localISOTime
     );
 
     if (result?.success) {
-      alert(`Campaign scheduled for ${new Date(scheduledTime).toLocaleString()}`);
+      alert(`Campaign scheduled for ${new Date(localISOTime).toLocaleString()}`);
       setSendModalOpen(false);
       setScheduledTime('');
     } else {

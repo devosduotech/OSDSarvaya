@@ -529,7 +529,7 @@ setInterval(async () => {
     const dueRuns = await db.all(
       `SELECT id, campaignTemplateId, targetGroupIds FROM campaign_runs 
        WHERE status = 'Scheduled' AND scheduledAt <= ?`,
-      now
+      [now]
     );
 
     for (const run of dueRuns) {
@@ -823,12 +823,12 @@ async function processRun(runId, templateId, groupIds) {
 
     await db.run(
       `UPDATE campaign_runs SET status='Sent' WHERE id=?`,
-      runId
+      [runId]
     );
 
     // Get failed contacts for retry
     const maxRetries = settingsObj.maxRetries || 3;
-    const currentRetryCount = (await db.get(`SELECT retryCount FROM campaign_runs WHERE id=?`, runId))?.retryCount || 0;
+    const currentRetryCount = (await db.get(`SELECT retryCount FROM campaign_runs WHERE id=?`, [runId]))?.retryCount || 0;
     
     if (failed > 0 && currentRetryCount < maxRetries) {
       logger.info(`Retrying failed messages: ${failed} contacts, attempt ${currentRetryCount + 1}/${maxRetries}`);
@@ -843,7 +843,7 @@ async function processRun(runId, templateId, groupIds) {
           WHERE campaignRunId = ? AND status = 'sent'
         )
         AND c.optedIn = 1
-      `, ...groupIds, runId);
+      `, [...groupIds, runId]);
       
       // Update retry count
       await db.run(`UPDATE campaign_runs SET retryCount = ? WHERE id=?`, [currentRetryCount + 1, runId]);
