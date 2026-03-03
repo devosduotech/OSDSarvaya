@@ -121,7 +121,47 @@ const FAQ: React.FC = () => {
     },
     {
       question: 'What is the recommended messages per hour setting?',
-      answer: `We recommend starting with 50-65 messages per hour. You can increase this gradually based on your needs. Setting it too high may result in WhatsApp temporarily blocking your account.`
+      answer: `We recommend starting with <strong>30 messages per hour</strong> to avoid WhatsApp restrictions. You can adjust this in Settings > Rate Limiting.
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li>Start with 30 msgs/hr for new accounts</li>
+          <li>After a few successful campaigns, you can gradually increase</li>
+          <li>Stay below 40-50 msgs/hr to minimize ban risk</li>
+          <li>If you get restricted, reduce to 15-20 msgs/hr</li>
+        </ul>`
+    },
+    {
+      question: 'Why did WhatsApp restrict my account?',
+      answer: `WhatsApp may restrict accounts for sending:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li>Too many messages in a short time</li>
+          <li>Bulk or automated messages to unknown contacts</li>
+          <li>Messages to people who haven't saved your number</li>
+          <li>Many people blocking or reporting your number</li>
+        </ul>
+        <p class="mt-2">Restrictions typically last 24-48 hours. During this time, avoid using the app heavily.</p>`
+    },
+    {
+      question: 'How do I avoid WhatsApp account restrictions?',
+      answer: `Follow these best practices:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li><strong>Use lower sending rates</strong> - Start with 30 msgs/hr, stay below 40-50</li>
+          <li><strong>Add random delays</strong> - The app adds jitter between messages to appear more human</li>
+          <li><strong>Warm up gradually</strong> - Start with small campaigns (10-20 messages), then increase</li>
+          <li><strong>Send to opted-in contacts</strong> - Only message people who expect to hear from you</li>
+          <li><strong>Space out campaigns</strong> - Wait a few hours between large campaigns</li>
+          <li><strong>Don't send to unknown numbers</strong> - Only message contacts in your phone</li>
+        </ul>`
+    },
+    {
+      question: 'My WhatsApp got restricted. What should I do?',
+      answer: `If WhatsApp restricts your account:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li><strong>Wait it out</strong> - Restrictions usually last 24-48 hours</li>
+          <li><strong>Don't try to send more</strong> - This will extend the ban</li>
+          <li><strong>Reduce message rate</strong> - Lower your msgs/hr setting to 15-20</li>
+          <li><strong>Message slowly when restored</strong> - Start with fewer messages per hour</li>
+          <li><strong>Consider WhatsApp Business API</strong> - For legitimate bulk messaging needs</li>
+        </ul>`
     },
     {
       question: 'Why do some messages show as failed?',
