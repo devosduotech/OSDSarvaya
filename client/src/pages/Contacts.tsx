@@ -84,11 +84,11 @@ const Contacts: React.FC = () => {
         .slice(1)
         .map(line => {
           const columns = line.split(',');
-          const name = columns[0]?.trim() || '';
-          const phone = columns[1]?.trim() || '';
-          const email = columns[2]?.trim() || '';
+          const name = columns[1]?.trim() || '';
+          const phone = columns[2]?.trim() || '';
+          const email = columns[3]?.trim() || '';
           
-          const tagColumns = columns.slice(3).filter(t => t.trim() !== '');
+          const tagColumns = columns.slice(4).filter(t => t.trim() !== '');
           const tags = tagColumns.map(t => t.trim()).join(';');
 
           return { name, phone, email, tags };
