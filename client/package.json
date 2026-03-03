@@ -1,7 +1,7 @@
 {
   "name": "osdsarvaya-client",
   "private": true,
-  "version": "1.1.21",
+  "version": "1.1.22",
   "description": "OSDSarvaya - WhatsApp Bulk Messaging Application",
   "author": "OSDuo Tech",
   "type": "module",
