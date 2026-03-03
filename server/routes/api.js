@@ -125,12 +125,15 @@ router.post('/contacts/bulk', async (req, res) => {
     }
     
     if (validContacts.length === 0) {
+        console.log('Bulk import failed:', { total: contacts.length, invalidPhones: invalidPhones.length, duplicates: duplicates.length });
         return res.status(400).json({ 
             message: 'No valid contacts to import.',
             imported: 0,
             skipped: invalidPhones.length + duplicates.length,
             invalidPhones: invalidPhones.length,
-            duplicates: duplicates.length
+            invalidPhoneSamples: invalidPhones.slice(0, 5),
+            duplicates: duplicates.length,
+            duplicateSamples: duplicates.slice(0, 5)
         });
     }
     
