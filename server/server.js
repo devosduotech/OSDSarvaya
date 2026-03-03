@@ -793,11 +793,17 @@ async function processRun(runId, templateId, groupIds) {
       acc[key] = isNaN(Number(value)) ? value : Number(value);
       return acc;
     }, {});
-    const messagesPerHour = settingsObj.messagesPerHour || 65;
-    const rateLimitDelay = Math.round(3600000 / messagesPerHour);
-    const minMessageDelay = Math.max(rateLimitDelay, 3000); // Minimum 3s delay to prevent disconnection
+    const messagesPerHour = settingsObj.messagesPerHour || 30; // Reduced from 65 to 30 to avoid restrictions
+    const baseDelay = Math.round(3600000 / messagesPerHour);
+    const minMessageDelay = Math.max(baseDelay, 5000); // Minimum 5s delay to prevent disconnection
 
-    logger.info(`Rate limit: ${messagesPerHour} msgs/hour, delay: ${minMessageDelay}ms`);
+    // Helper for random delay with jitter (adds 0-50% randomness to appear more human)
+    const getRandomDelay = (baseMs) => {
+      const jitter = Math.random() * (baseMs * 0.5);
+      return Math.round(baseMs + jitter);
+    };
+
+    logger.info(`Rate limit: ${messagesPerHour} msgs/hour, base delay: ${minMessageDelay}ms with jitter`);
     logger.info(`WhatsApp client status: ${waClient ? 'exists' : 'null'}, info: ${waClient?.info?.wid?._serialized || 'no info'}`);
 
     await db.run(
@@ -930,9 +936,9 @@ async function processRun(runId, templateId, groupIds) {
         return;
       }
 
-      // Rate limiting: dynamic delay based on messagesPerHour setting (minimum 3s to prevent disconnection)
+      // Rate limiting: dynamic delay with jitter to appear more human
       if (sent + failed < contacts.length) {
-        await new Promise(r => setTimeout(r, minMessageDelay));
+        await new Promise(r => setTimeout(r, getRandomDelay(minMessageDelay)));
       }
     }
 
@@ -996,8 +1002,8 @@ async function processRun(runId, templateId, groupIds) {
           logger.error({ err }, 'RETRY SEND FAILED');
         }
         
-        // Rate limiting for retries too
-        await new Promise(r => setTimeout(r, minMessageDelay));
+        // Rate limiting for retries too (with jitter)
+        await new Promise(r => setTimeout(r, getRandomDelay(minMessageDelay)));
       }
       
       // Update final report

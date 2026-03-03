@@ -258,7 +258,7 @@ const initializeDb = async () => {
             )
         `);
 
-        db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('messagesPerHour', '65')");
+        db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('messagesPerHour', '30')");
         db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('maxRetries', '3')");
 
         saveDatabase();
