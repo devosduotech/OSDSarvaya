@@ -3,7 +3,6 @@ require('dotenv').config();
 const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs');
 const fsPromises = require('fs/promises');
 const path = require('path');
@@ -13,6 +12,27 @@ const jwt = require('jsonwebtoken');
 const logger = require('./logger');
 const { verifyToken, verifySocketToken } = require('./middleware/auth');
 const dbPromise = require('./database');
+
+// Try to load whatsapp-web.js with error handling
+let Client, LocalAuth, MessageMedia;
+try {
+  const wwjs = require('whatsapp-web.js');
+  Client = wwjs.Client;
+  LocalAuth = wwjs.LocalAuth;
+  MessageMedia = wwjs.MessageMedia;
+  logger.info('whatsapp-web.js loaded successfully');
+} catch (err) {
+  logger.error({ err }, 'Failed to load whatsapp-web.js');
+  Client = null;
+  LocalAuth = null;
+  MessageMedia = null;
+}
+
+// Check if running in Electron and get Chromium path
+function getElectronChromiumPath() {
+  const electron = require('electron');
+  return process.execPath.replace(/\[^.exe\]+/, 'resources\\chrome-win\\chrome.exe').replace('OSDSarvaya.exe', 'chrome-win\\chrome.exe');
+}
 
 // Load production.env explicitly if it exists (for packaged app)
 const productionEnvPath = path.join(__dirname, 'production.env');
@@ -265,6 +285,12 @@ function changeStatus(newStatus) {
 async function initializeWhatsAppClient() {
 
   if (waClient) return;
+  
+  // Check if whatsapp-web.js loaded properly
+  if (!Client) {
+    logger.error('whatsapp-web.js not loaded - cannot initialize WhatsApp');
+    throw new Error('whatsapp-web.js failed to load');
+  }
 
   const maxRetries = 3;
   let attempt = 0;
@@ -303,13 +329,38 @@ async function initializeWhatsAppClient() {
         ]
       };
 
-      // Use custom Chromium path if provided, otherwise let puppeteer find its own
-      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-        puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-        logger.info('Using custom PUPPETEER_EXECUTABLE_PATH:', process.env.PUPPETEER_EXECUTABLE_PATH);
-      } else if (process.env.CHROME_PATH) {
-        puppeteerOptions.executablePath = process.env.CHROME_PATH;
-        logger.info('Using CHROME_PATH:', process.env.CHROME_PATH);
+      // Try to find Chromium - check multiple common locations
+      let foundChromium = null;
+      
+      // Check environment variables first
+      if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+        foundChromium = process.env.PUPPETEER_EXECUTABLE_PATH;
+        logger.info('Using PUPPETEER_EXECUTABLE_PATH:', foundChromium);
+      } else if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
+        foundChromium = process.env.CHROME_PATH;
+        logger.info('Using CHROME_PATH:', foundChromium);
+      } else {
+        // Try Electron's bundled Chromium (common paths)
+        const possiblePaths = [
+          path.join(process.resourcesPath || '', 'chrome-win', 'chrome.exe'),
+          path.join(process.resourcesPath || '', 'app.asar.unpacked', 'chrome-win', 'chrome.exe'),
+          'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+          'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        ];
+        
+        for (const p of possiblePaths) {
+          if (fs.existsSync(p)) {
+            foundChromium = p;
+            logger.info('Found Chromium at:', foundChromium);
+            break;
+          }
+        }
+      }
+      
+      if (foundChromium) {
+        puppeteerOptions.executablePath = foundChromium;
+      } else {
+        logger.warn('No Chromium found - puppeteer will try to use its bundled version');
       }
 
       logger.info('Creating WhatsApp client with puppeteer options...');
