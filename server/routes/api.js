@@ -134,10 +134,9 @@ router.post('/contacts/bulk', async (req, res) => {
         });
     }
     
-    const stmt = await db.prepare("INSERT INTO contacts (id, name, phone, email, tags) VALUES (?, ?, ?, ?, ?)");
     try {
         for (const c of validContacts) {
-            await stmt.run([c.id, c.name, c.phone, c.email || '', c.tags || '']);
+            await db.run("INSERT INTO contacts (id, name, phone, email, tags) VALUES (?, ?, ?, ?, ?)", [c.id, c.name, c.phone, c.email || '', c.tags || '']);
         }
         
         const totalSkipped = invalidPhones.length + duplicates.length;
@@ -151,8 +150,6 @@ router.post('/contacts/bulk', async (req, res) => {
     } catch (err) {
         logger.error({ err }, "Failed to bulk import contacts");
         res.status(500).json({ message: 'Error importing contacts.' });
-    } finally {
-        await stmt.finalize();
     }
 });
 
@@ -358,25 +355,14 @@ router.post('/backup', async (req, res) => {
         await Promise.all(['group_contacts', 'contacts', 'groups', 'reports', 'campaign_runs', 'campaign_templates', 'settings'].map(t => db.run(`DELETE FROM ${t}`)));
 
         // Insert new data
-        const statements = {
-            contact: await db.prepare("INSERT INTO contacts (id, name, phone, email, tags) VALUES (?, ?, ?, ?, ?)"),
-            group: await db.prepare("INSERT INTO groups (id, name) VALUES (?, ?)"),
-            template: await db.prepare("INSERT INTO campaign_templates (id, name, message, attachment, createdAt) VALUES (?, ?, ?, ?, ?)"),
-            run: await db.prepare("INSERT INTO campaign_runs (id, campaignTemplateId, targetGroupIds, status, createdAt) VALUES (?, ?, ?, ?, ?)"),
-            report: await db.prepare("INSERT INTO reports (campaignRunId, totalContacts, sent, delivered, read, failed, progress) VALUES (?, ?, ?, ?, ?, ?, ?)"),
-            setting: await db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)"),
-            group_contact: await db.prepare("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)")
-        };
+        for (const c of contacts) await db.run("INSERT INTO contacts (id, name, phone, email, tags) VALUES (?, ?, ?, ?, ?)", [c.id, c.name, c.phone, c.email, c.tags]);
+        for (const g of groups) await db.run("INSERT INTO groups (id, name) VALUES (?, ?)", [g.id, g.name]);
+        for (const t of templates) await db.run("INSERT INTO campaign_templates (id, name, message, attachment, createdAt) VALUES (?, ?, ?, ?, ?)", [t.id, t.name, t.message, t.attachment, t.createdAt]);
+        for (const r of runs) await db.run("INSERT INTO campaign_runs (id, campaignTemplateId, targetGroupIds, status, createdAt) VALUES (?, ?, ?, ?, ?)", [r.id, r.campaignTemplateId, r.targetGroupIds, r.status, r.createdAt]);
+        for (const r of reports) await db.run("INSERT INTO reports (campaignRunId, totalContacts, sent, delivered, read, failed, progress) VALUES (?, ?, ?, ?, ?, ?, ?)", [r.campaignRunId, r.totalContacts, r.sent, r.delivered, r.read, r.failed, r.progress]);
+        for (const s of settings) await db.run("INSERT INTO settings (key, value) VALUES (?, ?)", [s.key, s.value]);
+        for (const gc of group_contacts) await db.run("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)", [gc.group_id, gc.contact_id]);
 
-        for (const c of contacts) await statements.contact.run([c.id, c.name, c.phone, c.email, c.tags]);
-        for (const g of groups) await statements.group.run([g.id, g.name]);
-        for (const t of templates) await statements.template.run([t.id, t.name, t.message, t.attachment, t.createdAt]);
-        for (const r of runs) await statements.run.run([r.id, r.campaignTemplateId, r.targetGroupIds, r.status, r.createdAt]);
-        for (const r of reports) await statements.report.run([r.campaignRunId, r.totalContacts, r.sent, r.delivered, r.read, r.failed, r.progress]);
-        for (const s of settings) await statements.setting.run([s.key, s.value]);
-        for (const gc of group_contacts) await statements.group_contact.run([gc.group_id, gc.contact_id]);
-
-        await Promise.all(Object.values(statements).map(s => s.finalize()));
         res.status(200).json({ message: 'Restore successful.' });
     } catch (err) {
         logger.error({ err }, "Restore failed");
