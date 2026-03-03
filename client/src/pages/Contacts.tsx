@@ -6,14 +6,17 @@ import Button from '../components/ui/Button';
 import { UploadIcon, TrashIcon, PlusIcon, EditIcon, SearchIcon } from '../components/icons/Icons';
 
 const Contacts: React.FC = () => {
-  const { contacts, addContact, updateContact, deleteContact, addContactsBulk, toggleContactOptStatus } = useAppContext();
+  const { contacts, addContact, updateContact, deleteContact, addContactsBulk, updateContactsBulk, deleteContactsBulk, toggleContactOptStatus, showToast } = useAppContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const updateFileInputRef = useRef<HTMLInputElement>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [currentContact, setCurrentContact] = useState<Partial<Contact>>({
     name: '',
@@ -109,6 +112,83 @@ const Contacts: React.FC = () => {
   };
 
   // ================================
+  // BULK UPDATE IMPORT
+  // ================================
+  const handleUpdateFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split('\n').filter(line => line.trim() !== '');
+
+      const contactsToUpdate = lines
+        .slice(1)
+        .map(line => {
+          const columns = line.split(',');
+          const phone = columns[2]?.trim() || '';
+          const name = columns[1]?.trim() || '';
+          const email = columns[3]?.trim() || '';
+          const tagColumns = columns.slice(4).filter(t => t.trim() !== '');
+          const tags = tagColumns.map(t => t.trim()).join(';');
+
+          return { phone, name, email, tags };
+        })
+        .filter(c => c.phone);
+
+      if (contactsToUpdate.length === 0) {
+        showToast('No valid contacts found in CSV', 'error');
+        return;
+      }
+
+      const result = await updateContactsBulk(contactsToUpdate);
+      if (result) {
+        showToast(`Updated ${result.updated} contacts. ${result.notFound} phone numbers not found.`, result.notFound > 0 ? 'warning' : 'success');
+      } else {
+        showToast('Failed to update contacts', 'error');
+      }
+    };
+
+    reader.readAsText(file);
+    if (updateFileInputRef.current) updateFileInputRef.current.value = "";
+  };
+
+  // ================================
+  // BULK DELETE
+  // ================================
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredContacts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredContacts.map(c => c.id)));
+    }
+  };
+
+  const handleSelectContact = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    const success = await deleteContactsBulk(ids);
+    if (success) {
+      showToast(`Deleted ${ids.length} contacts`, 'success');
+      setSelectedIds(new Set());
+      setShowDeleteConfirm(false);
+    } else {
+      showToast('Failed to delete contacts', 'error');
+    }
+  };
+
+  // ================================
   // SAVE CONTACT
   // ================================
   const handleSaveContact = async () => {
@@ -171,13 +251,29 @@ const Contacts: React.FC = () => {
               onClick={() => fileInputRef.current?.click()}
             >
               <UploadIcon className="w-4 h-4 mr-2" />
-              Import CSV
+              Import New
+            </Button>
+
+            <Button
+              variant="secondary"
+              onClick={() => updateFileInputRef.current?.click()}
+            >
+              <UploadIcon className="w-4 h-4 mr-2" />
+              Import Updates
             </Button>
 
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
+              accept=".csv"
+              hidden
+            />
+
+            <input
+              type="file"
+              ref={updateFileInputRef}
+              onChange={handleUpdateFileChange}
               accept=".csv"
               hidden
             />
@@ -229,6 +325,28 @@ const Contacts: React.FC = () => {
             Showing {filteredContacts.length} of {contacts.length} contacts
           </p>
         )}
+
+        {/* BULK DELETE */}
+        {selectedIds.size > 0 && (
+          <div className="mt-3 flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+            <span className="text-sm text-red-700 dark:text-red-300">
+              {selectedIds.size} contact{selectedIds.size > 1 ? 's' : ''} selected
+            </span>
+            <Button
+              variant="danger"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <TrashIcon className="w-4 h-4 mr-1" />
+              Delete Selected
+            </Button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </Card>
 
       {/* TABLE */}
@@ -238,6 +356,14 @@ const Contacts: React.FC = () => {
 
             <thead className="bg-slate-50 dark:bg-slate-800">
               <tr>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === filteredContacts.length && filteredContacts.length > 0}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Phone</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Email</th>
@@ -250,6 +376,15 @@ const Contacts: React.FC = () => {
             <tbody className="divide-y divide-gray-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
               {filteredContacts.map(contact => (
                 <tr key={contact.id} className="hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+
+                  <td className="px-4 py-4 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(contact.id)}
+                      onChange={() => handleSelectContact(contact.id)}
+                      className="w-4 h-4 rounded border-gray-300"
+                    />
+                  </td>
 
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                     {contact.name}
@@ -381,6 +516,28 @@ const Contacts: React.FC = () => {
               </Button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-sm p-6 rounded-xl space-y-4 shadow-lg">
+            <h2 className="text-xl font-semibold dark:text-white">
+              Delete Contacts
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300">
+              Are you sure you want to delete {selectedIds.size} contact{selectedIds.size > 1 ? 's' : ''}? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleBulkDelete}>
+                Delete
+              </Button>
+            </div>
           </div>
         </div>
       )}

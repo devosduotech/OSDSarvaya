@@ -47,6 +47,8 @@ interface AppContextType {
   deleteContact: (id: string) => Promise<boolean>;
   toggleContactOptStatus: (id: string, optedIn: boolean) => Promise<boolean>;
   addContactsBulk: (contacts: Omit<Contact, 'id'>[]) => Promise<boolean>;
+  updateContactsBulk: (contacts: { phone: string; name?: string; email?: string; tags?: string }[]) => Promise<{ updated: number; notFound: number; notFoundPhones?: string[] } | null>;
+  deleteContactsBulk: (ids: string[]) => Promise<boolean>;
 
   addGroup: (group: { name: string; contactIds: string[] }) => Promise<Group | null>;
   updateGroup: (group: Group) => Promise<Group | null>;
@@ -369,6 +371,30 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  const updateContactsBulk = async (contacts: { phone: string; name?: string; email?: string; tags?: string }[]) => {
+    try {
+      const result = await apiRequest('/contacts/bulk-update', 'POST', contacts) as { 
+        updated: number; 
+        notFound: number; 
+        notFoundPhones?: string[];
+      };
+      await fetchData();
+      return result;
+    } catch {
+      return null;
+    }
+  };
+
+  const deleteContactsBulk = async (ids: string[]) => {
+    try {
+      await apiRequest('/contacts/bulk', 'DELETE', { ids });
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const addGroup = async (group: { name: string; contactIds: string[] }) => {
     const newGroup = { ...group, id: `group_${Date.now()}` };
     try {
@@ -653,6 +679,8 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     deleteContact,
     toggleContactOptStatus,
     addContactsBulk,
+    updateContactsBulk,
+    deleteContactsBulk,
     addGroup,
     updateGroup,
     deleteGroup,
