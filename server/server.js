@@ -343,15 +343,28 @@ async function initializeWhatsAppClient() {
         foundChromium = process.env.CHROME_PATH;
         logger.info('Using CHROME_PATH:', foundChromium);
       } else {
-        // Try Electron's bundled Chromium (common paths)
+        // Try Electron's executable path and derive Chrome from there
+        // Also try common Windows browser paths
+        const execDir = path.dirname(process.execPath);
         const possiblePaths = [
+          path.join(execDir, 'chrome-win', 'chrome.exe'),
           path.join(process.resourcesPath || '', 'chrome-win', 'chrome.exe'),
           path.join(process.resourcesPath || '', 'app.asar.unpacked', 'chrome-win', 'chrome.exe'),
+          // Try system browsers
           'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
           'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+          'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+          'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+          // Try finding in Electron app folder
+          path.join(execDir, 'msedge.exe'),
         ];
         
+        console.error('[WA_INIT] Looking for Chromium/Chrome...');
+        console.error('[WA_INIT] execPath:', process.execPath);
+        console.error('[WA_INIT] resourcesPath:', process.resourcesPath);
+        
         for (const p of possiblePaths) {
+          console.error('[WA_INIT] Checking:', p, 'exists:', fs.existsSync(p));
           if (fs.existsSync(p)) {
             foundChromium = p;
             logger.info('Found Chromium at:', foundChromium);
@@ -359,6 +372,8 @@ async function initializeWhatsAppClient() {
           }
         }
       }
+      
+      console.error('[WA_INIT] Final foundChromium:', foundChromium);
       
       if (foundChromium) {
         puppeteerOptions.executablePath = foundChromium;
@@ -451,12 +466,16 @@ async function initializeWhatsAppClient() {
         }
       });
 
-      await waClient.initialize();
-      return true;
-
-    } catch (err) {
-      logger.error({ err, attempt, stack: err.stack }, 'WA INIT ERROR - Full details');
-      waClient = null;
+      console.error('[WA_INIT] About to call waClient.initialize()...');
+      try {
+        await waClient.initialize();
+        console.error('[WA_INIT] waClient.initialize() completed successfully');
+        return true;
+      } catch (initErr) {
+        console.error('[WA_INIT] waClient.initialize() FAILED:', initErr.message);
+        console.error('[WA_INIT] Stack:', initErr.stack);
+        logger.error({ err: initErr, attempt, stack: initErr.stack }, 'WA INIT ERROR - Full details');
+        waClient = null;
       
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt) * 2000;
