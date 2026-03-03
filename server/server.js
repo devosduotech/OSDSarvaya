@@ -1068,14 +1068,18 @@ async function processRun(runId, templateId, groupIds) {
 app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
   logger.info(`WhatsApp connect API called, waStatus: ${waStatus}, waClient exists: ${!!waClient}`);
   
-  if (waClient) {
+  if (waClient && waStatus === 'CONNECTED') {
     return res.json({ success: true, status: waStatus, message: 'WhatsApp already connected' });
   }
   
   changeStatus('CONNECTING');
   
   try {
-    await initializeWhatsAppClient();
+    const result = await initializeWhatsAppClient();
+    if (!result) {
+      changeStatus('FAILED');
+      return res.status(500).json({ success: false, status: 'FAILED', message: 'Failed to initialize WhatsApp' });
+    }
     return res.json({ success: true, status: waStatus });
   } catch (err) {
     logger.error({ err }, 'WhatsApp connect failed');
