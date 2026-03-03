@@ -303,9 +303,16 @@ async function initializeWhatsAppClient() {
         ]
       };
 
+      // Use custom Chromium path if provided, otherwise let puppeteer find its own
       if (process.env.PUPPETEER_EXECUTABLE_PATH) {
         puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+        logger.info('Using custom PUPPETEER_EXECUTABLE_PATH:', process.env.PUPPETEER_EXECUTABLE_PATH);
+      } else if (process.env.CHROME_PATH) {
+        puppeteerOptions.executablePath = process.env.CHROME_PATH;
+        logger.info('Using CHROME_PATH:', process.env.CHROME_PATH);
       }
+
+      logger.info('Creating WhatsApp client with puppeteer options...');
 
       waClient = new Client({
         authStrategy: new LocalAuth({ dataPath: getSessionPath() }),
@@ -394,7 +401,7 @@ async function initializeWhatsAppClient() {
       return true;
 
     } catch (err) {
-      logger.error({ err, attempt }, 'WA INIT ERROR');
+      logger.error({ err, attempt, stack: err.stack }, 'WA INIT ERROR - Full details');
       waClient = null;
       
       if (attempt < maxRetries) {
@@ -1078,13 +1085,13 @@ app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
     const result = await initializeWhatsAppClient();
     if (!result) {
       changeStatus('FAILED');
-      return res.status(500).json({ success: false, status: 'FAILED', message: 'Failed to initialize WhatsApp' });
+      return res.status(500).json({ success: false, status: 'FAILED', message: 'Failed to initialize WhatsApp - check server logs' });
     }
     return res.json({ success: true, status: waStatus });
   } catch (err) {
-    logger.error({ err }, 'WhatsApp connect failed');
+    logger.error({ err, stack: err.stack }, 'WhatsApp connect failed - EXCEPTION');
     changeStatus('FAILED');
-    return res.status(500).json({ success: false, message: 'Failed to connect WhatsApp' });
+    return res.status(500).json({ success: false, message: 'Failed to connect WhatsApp: ' + err.message });
   }
 });
 
