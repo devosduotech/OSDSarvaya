@@ -288,15 +288,18 @@ async function initializeWhatsAppClient() {
   
   // Check if whatsapp-web.js loaded properly
   if (!Client) {
+    console.error('[WA_INIT] whatsapp-web.js not loaded - Client is null!');
     logger.error('whatsapp-web.js not loaded - cannot initialize WhatsApp');
     throw new Error('whatsapp-web.js failed to load');
   }
+  console.error('[WA_INIT] whatsapp-web.js loaded successfully');
 
   const maxRetries = 3;
   let attempt = 0;
 
   async function attemptInit() {
     attempt++;
+    console.error(`[WA_INIT] Attempt ${attempt}/${maxRetries}`);
     logger.info(`WhatsApp initialization attempt ${attempt}/${maxRetries}`);
 
     try {
@@ -1125,6 +1128,7 @@ async function processRun(runId, templateId, groupIds) {
 // REST API fallback for WhatsApp connection (more reliable on Windows)
 app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
   logger.info(`WhatsApp connect API called, waStatus: ${waStatus}, waClient exists: ${!!waClient}`);
+  console.error('[WA_CONNECT] Starting WhatsApp connection...');
   
   if (waClient && waStatus === 'CONNECTED') {
     return res.json({ success: true, status: waStatus, message: 'WhatsApp already connected' });
@@ -1133,13 +1137,17 @@ app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
   changeStatus('CONNECTING');
   
   try {
+    console.error('[WA_CONNECT] Calling initializeWhatsAppClient...');
     const result = await initializeWhatsAppClient();
+    console.error('[WA_CONNECT] initializeWhatsAppClient returned:', result);
     if (!result) {
       changeStatus('FAILED');
       return res.status(500).json({ success: false, status: 'FAILED', message: 'Failed to initialize WhatsApp - check server logs' });
     }
     return res.json({ success: true, status: waStatus });
   } catch (err) {
+    console.error('[WA_CONNECT] EXCEPTION:', err.message);
+    console.error('[WA_CONNECT] STACK:', err.stack);
     logger.error({ err, stack: err.stack }, 'WhatsApp connect failed - EXCEPTION');
     changeStatus('FAILED');
     return res.status(500).json({ success: false, message: 'Failed to connect WhatsApp: ' + err.message });
