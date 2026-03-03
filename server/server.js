@@ -781,13 +781,16 @@ async function processRun(runId, templateId, groupIds) {
 
       try {
 
+        // Small delay to let WhatsApp client stabilize
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         const formatted = normalizePhone(contact.phone);
         logger.info(`Looking up WhatsApp ID for: ${formatted}`);
         
-        // Add timeout for getNumberId
+        // Add timeout for getNumberId (increased to 30 seconds)
         const numberId = await Promise.race([
-          waClient.getNumberId(`${formatted}@c.us`),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('getNumberId timeout')), 10000))
+          waClient.getNumberId(formatted),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('getNumberId timeout')), 30000))
         ]);
 
         if (!numberId) {
