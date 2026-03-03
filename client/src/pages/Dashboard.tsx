@@ -15,11 +15,33 @@ const Dashboard: React.FC = () => {
     campaignRuns,
     activities,
     isCampaignRunning,
-    stopCampaignRun
+    stopCampaignRun,
+    cancelAllScheduledCampaigns,
+    getFailedMessages,
+    showToast
   } = useAppContext();
 
   const [selectedCampaignRunId, setSelectedCampaignRunId] = useState<string>('');
   const [alert, setAlert] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [failedMessages, setFailedMessages] = useState<{contactPhone: string; contactName: string | null; reason: string}[]>([]);
+
+  const handleCancelAllScheduled = async () => {
+    const count = await cancelAllScheduledCampaigns();
+    if (count > 0) {
+      showToast(`${count} scheduled/queued campaigns cancelled`, 'success');
+    } else {
+      showToast('No scheduled campaigns to cancel', 'info');
+    }
+  };
+
+  // Fetch failed messages when campaign is selected
+  useEffect(() => {
+    if (selectedCampaignRunId) {
+      getFailedMessages(selectedCampaignRunId).then(setFailedMessages);
+    } else {
+      setFailedMessages([]);
+    }
+  }, [selectedCampaignRunId]);
 
   // Show alert only for the last campaign if failed and not yet acknowledged
   useEffect(() => {
@@ -96,6 +118,8 @@ const Dashboard: React.FC = () => {
     const successRate = total > 0 ? Math.round((totalSent / total) * 100) : 0;
     return { totalSent, totalFailed, total, successRate };
   }, [reports]);
+
+  const hasScheduledOrQueued = campaignRuns.some(r => r.status === 'Scheduled' || r.status === 'Queued');
 
   // =========================
   // ACTIVITY HELPERS
@@ -219,6 +243,15 @@ const formatTime = (timestamp: string | number | undefined) => {
               Campaign Analysis
             </h2>
 
+            {hasScheduledOrQueued && (
+              <button
+                onClick={handleCancelAllScheduled}
+                className="text-xs px-2 py-1 bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800 transition"
+              >
+                Cancel All Scheduled
+              </button>
+            )}
+
             <select
               value={selectedCampaignRunId}
               onChange={(e) => setSelectedCampaignRunId(e.target.value)}
@@ -272,6 +305,28 @@ const formatTime = (timestamp: string | number | undefined) => {
                     />
                   </div>
 
+                </div>
+              )}
+
+              {/* FAILED MESSAGES */}
+              {failedMessages.length > 0 && (
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                  <h4 className="text-sm font-semibold text-red-700 dark:text-red-300 mb-2">
+                    Failed Messages ({failedMessages.length})
+                  </h4>
+                  <div className="max-h-40 overflow-y-auto text-xs space-y-1">
+                    {failedMessages.slice(0, 10).map((msg, i) => (
+                      <div key={i} className="flex justify-between text-red-600 dark:text-red-400">
+                        <span>{msg.contactName || msg.contactPhone}</span>
+                        <span className="truncate max-w-[150px]" title={msg.reason}>{msg.reason}</span>
+                      </div>
+                    ))}
+                    {failedMessages.length > 10 && (
+                      <div className="text-red-500 text-xs">
+                        ...and {failedMessages.length - 10} more
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

@@ -180,6 +180,18 @@ const initializeDb = async () => {
         `);
 
         db.run(`
+            CREATE TABLE IF NOT EXISTS failed_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                campaignRunId TEXT NOT NULL,
+                contactPhone TEXT NOT NULL,
+                contactName TEXT,
+                reason TEXT NOT NULL,
+                createdAt TEXT NOT NULL,
+                FOREIGN KEY (campaignRunId) REFERENCES campaign_runs(id) ON DELETE CASCADE
+            )
+        `);
+
+        db.run(`
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL

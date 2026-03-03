@@ -659,6 +659,41 @@ app.post('/api/campaigns/cancel/:id', verifyToken, async (req, res) => {
   }
 });
 
+app.post('/api/campaigns/cancel-all', verifyToken, async (req, res) => {
+  const db = await dbPromise;
+
+  try {
+    const result = await db.run(
+      "UPDATE campaign_runs SET status = 'Cancelled' WHERE status IN ('Scheduled', 'Queued')"
+    );
+
+    const count = result.changes;
+    logger.info(`Cancelled ${count} scheduled/queued campaigns`);
+    emitActivity('campaigns_cancelled', `${count} scheduled/queued campaigns cancelled`);
+
+    return res.json({ success: true, cancelled: count });
+  } catch (err) {
+    logger.error(err);
+    return res.status(500).json({ success: false });
+  }
+});
+
+app.get('/api/campaigns/failed/:runId', verifyToken, async (req, res) => {
+  const db = await dbPromise;
+  const { runId } = req.params;
+
+  try {
+    const failedMessages = await db.all(
+      `SELECT * FROM failed_messages WHERE campaignRunId = ? ORDER BY createdAt DESC LIMIT 100`,
+      [runId]
+    );
+    return res.json({ success: true, failedMessages });
+  } catch (err) {
+    logger.error(err);
+    return res.status(500).json({ success: false });
+  }
+});
+
 
 // =====================================================
 // CAMPAIGN PROCESS (FINAL)
@@ -759,9 +794,10 @@ async function processRun(runId, templateId, groupIds) {
       return acc;
     }, {});
     const messagesPerHour = settingsObj.messagesPerHour || 65;
-    const delayMs = Math.round(3600000 / messagesPerHour);
+    const rateLimitDelay = Math.round(3600000 / messagesPerHour);
+    const minMessageDelay = Math.max(rateLimitDelay, 3000); // Minimum 3s delay to prevent disconnection
 
-    logger.info(`Rate limit: ${messagesPerHour} msgs/hour, delay: ${delayMs}ms`);
+    logger.info(`Rate limit: ${messagesPerHour} msgs/hour, delay: ${minMessageDelay}ms`);
     logger.info(`WhatsApp client status: ${waClient ? 'exists' : 'null'}, info: ${waClient?.info?.wid?._serialized || 'no info'}`);
 
     await db.run(
@@ -795,6 +831,10 @@ async function processRun(runId, templateId, groupIds) {
 
         if (!numberId) {
           logger.warn(`Not registered on WhatsApp: ${formatted}`);
+          await db.run(
+            `INSERT INTO failed_messages (campaignRunId, contactPhone, contactName, reason, createdAt) VALUES (?, ?, ?, ?, ?)`,
+            [runId, contact.phone, contact.name || null, 'Not registered on WhatsApp', new Date().toISOString()]
+          );
           failed++;
           continue;
         }
@@ -851,6 +891,14 @@ async function processRun(runId, templateId, groupIds) {
 
       } catch (err) {
         logger.error({ err, contact: contact.phone }, 'SEND FAILED');
+        
+        // Store failed message with reason
+        const reason = err.message || err.toString() || 'Unknown error';
+        await db.run(
+          `INSERT INTO failed_messages (campaignRunId, contactPhone, contactName, reason, createdAt) VALUES (?, ?, ?, ?, ?)`,
+          [runId, contact.phone, contact.name || null, reason, new Date().toISOString()]
+        );
+        
         failed++;
       }
 
@@ -882,9 +930,9 @@ async function processRun(runId, templateId, groupIds) {
         return;
       }
 
-      // Rate limiting: dynamic delay based on messagesPerHour setting
+      // Rate limiting: dynamic delay based on messagesPerHour setting (minimum 3s to prevent disconnection)
       if (sent + failed < contacts.length) {
-        await new Promise(r => setTimeout(r, delayMs));
+        await new Promise(r => setTimeout(r, minMessageDelay));
       }
     }
 
@@ -949,7 +997,7 @@ async function processRun(runId, templateId, groupIds) {
         }
         
         // Rate limiting for retries too
-        await new Promise(r => setTimeout(r, delayMs));
+        await new Promise(r => setTimeout(r, minMessageDelay));
       }
       
       // Update final report

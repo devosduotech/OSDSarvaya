@@ -13,7 +13,8 @@ import {
   Group,
   CampaignTemplate,
   CampaignRun,
-  CampaignReport
+  CampaignReport,
+  FailedMessage
 } from '../types';
 
 import io, { Socket } from 'socket.io-client';
@@ -68,6 +69,8 @@ interface AppContextType {
   stopCampaignRun: () => Promise<boolean>;
   scheduleCampaign: (templateId: string, groupIds: string[], scheduledAt: string) => Promise<{ success: boolean; runId: string } | null>;
   cancelQueuedCampaign: (runId: string) => Promise<boolean>;
+  cancelAllScheduledCampaigns: () => Promise<number>;
+  getFailedMessages: (runId: string) => Promise<FailedMessage[]>;
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   toast: { message: string; type: 'success' | 'error' | 'warning' | 'info' } | null;
   setToast: React.Dispatch<React.SetStateAction<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>>;
@@ -495,6 +498,25 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  const cancelAllScheduledCampaigns = async () => {
+    try {
+      const result = await apiRequest('/campaigns/cancel-all', 'POST') as { cancelled?: number };
+      await fetchData();
+      return result.cancelled || 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const getFailedMessages = async (runId: string) => {
+    try {
+      const result = await apiRequest(`/campaigns/failed/${runId}`, 'GET') as { failedMessages?: FailedMessage[] };
+      return result.failedMessages || [];
+    } catch {
+      return [];
+    }
+  };
+
   // =========================
   // BACKUP
   // =========================
@@ -647,6 +669,8 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     stopCampaignRun,
     scheduleCampaign,
     cancelQueuedCampaign,
+    cancelAllScheduledCampaigns,
+    getFailedMessages,
     showToast,
     toast,
     setToast,
