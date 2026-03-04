@@ -3,6 +3,7 @@ require('dotenv').config();
 const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs');
 const fsPromises = require('fs/promises');
 const path = require('path');
@@ -12,21 +13,6 @@ const jwt = require('jsonwebtoken');
 const logger = require('./logger');
 const { verifyToken, verifySocketToken } = require('./middleware/auth');
 const dbPromise = require('./database');
-
-// Try to load whatsapp-web.js with error handling
-let Client, LocalAuth, MessageMedia;
-try {
-  const wwjs = require('whatsapp-web.js');
-  Client = wwjs.Client;
-  LocalAuth = wwjs.LocalAuth;
-  MessageMedia = wwjs.MessageMedia;
-  logger.info('whatsapp-web.js loaded successfully');
-} catch (err) {
-  logger.error({ err }, 'Failed to load whatsapp-web.js');
-  Client = null;
-  LocalAuth = null;
-  MessageMedia = null;
-}
 
 // Check if running in Electron and get Chromium path
 function getElectronChromiumPath() {
@@ -286,20 +272,11 @@ async function initializeWhatsAppClient() {
 
   if (waClient) return;
   
-  // Check if whatsapp-web.js loaded properly
-  if (!Client) {
-    console.error('[WA_INIT] whatsapp-web.js not loaded - Client is null!');
-    logger.error('whatsapp-web.js not loaded - cannot initialize WhatsApp');
-    throw new Error('whatsapp-web.js failed to load');
-  }
-  console.error('[WA_INIT] whatsapp-web.js loaded successfully');
-
   const maxRetries = 3;
   let attempt = 0;
 
   async function attemptInit() {
     attempt++;
-    console.error(`[WA_INIT] Attempt ${attempt}/${maxRetries}`);
     logger.info(`WhatsApp initialization attempt ${attempt}/${maxRetries}`);
 
     try {
@@ -332,53 +309,8 @@ async function initializeWhatsAppClient() {
         ]
       };
 
-      // Try to find Chromium - check multiple common locations
-      let foundChromium = null;
-      
-      // Check environment variables first
-      if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
-        foundChromium = process.env.PUPPETEER_EXECUTABLE_PATH;
-        logger.info('Using PUPPETEER_EXECUTABLE_PATH:', foundChromium);
-      } else if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
-        foundChromium = process.env.CHROME_PATH;
-        logger.info('Using CHROME_PATH:', foundChromium);
-      } else {
-        // Try Electron's executable path and derive Chrome from there
-        // Also try common Windows browser paths
-        const execDir = path.dirname(process.execPath);
-        const possiblePaths = [
-          path.join(execDir, 'chrome-win', 'chrome.exe'),
-          path.join(process.resourcesPath || '', 'chrome-win', 'chrome.exe'),
-          path.join(process.resourcesPath || '', 'app.asar.unpacked', 'chrome-win', 'chrome.exe'),
-          // Try system browsers
-          'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-          'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-          'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-          'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-          // Try finding in Electron app folder
-          path.join(execDir, 'msedge.exe'),
-        ];
-        
-        console.error('[WA_INIT] Looking for Chromium/Chrome...');
-        console.error('[WA_INIT] execPath:', process.execPath);
-        console.error('[WA_INIT] resourcesPath:', process.resourcesPath);
-        
-        for (const p of possiblePaths) {
-          console.error('[WA_INIT] Checking:', p, 'exists:', fs.existsSync(p));
-          if (fs.existsSync(p)) {
-            foundChromium = p;
-            logger.info('Found Chromium at:', foundChromium);
-            break;
-          }
-        }
-      }
-      
-      console.error('[WA_INIT] Final foundChromium:', foundChromium);
-      
-      if (foundChromium) {
-        puppeteerOptions.executablePath = foundChromium;
-      } else {
-        logger.warn('No Chromium found - puppeteer will try to use its bundled version');
+      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
       }
 
       logger.info('Creating WhatsApp client with puppeteer options...');
@@ -466,16 +398,12 @@ async function initializeWhatsAppClient() {
         }
       });
 
-      console.error('[WA_INIT] About to call waClient.initialize()...');
-      try {
-        await waClient.initialize();
-        console.error('[WA_INIT] waClient.initialize() completed successfully');
-        return true;
-      } catch (initErr) {
-        console.error('[WA_INIT] waClient.initialize() FAILED:', initErr.message);
-        console.error('[WA_INIT] Stack:', initErr.stack);
-        logger.error({ err: initErr, attempt, stack: initErr.stack }, 'WA INIT ERROR - Full details');
-        waClient = null;
+      await waClient.initialize();
+      return true;
+
+    } catch (err) {
+      logger.error({ err, attempt }, 'WA INIT ERROR');
+      waClient = null;
       
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt) * 2000;
@@ -1147,7 +1075,6 @@ async function processRun(runId, templateId, groupIds) {
 // REST API fallback for WhatsApp connection (more reliable on Windows)
 app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
   logger.info(`WhatsApp connect API called, waStatus: ${waStatus}, waClient exists: ${!!waClient}`);
-  console.error('[WA_CONNECT] Starting WhatsApp connection...');
   
   if (waClient && waStatus === 'CONNECTED') {
     return res.json({ success: true, status: waStatus, message: 'WhatsApp already connected' });
@@ -1156,20 +1083,12 @@ app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
   changeStatus('CONNECTING');
   
   try {
-    console.error('[WA_CONNECT] Calling initializeWhatsAppClient...');
-    const result = await initializeWhatsAppClient();
-    console.error('[WA_CONNECT] initializeWhatsAppClient returned:', result);
-    if (!result) {
-      changeStatus('FAILED');
-      return res.status(500).json({ success: false, status: 'FAILED', message: 'Failed to initialize WhatsApp - check server logs' });
-    }
+    await initializeWhatsAppClient();
     return res.json({ success: true, status: waStatus });
   } catch (err) {
-    console.error('[WA_CONNECT] EXCEPTION:', err.message);
-    console.error('[WA_CONNECT] STACK:', err.stack);
-    logger.error({ err, stack: err.stack }, 'WhatsApp connect failed - EXCEPTION');
+    logger.error({ err }, 'WhatsApp connect failed');
     changeStatus('FAILED');
-    return res.status(500).json({ success: false, message: 'Failed to connect WhatsApp: ' + err.message });
+    return res.status(500).json({ success: false, message: 'Failed to connect WhatsApp' });
   }
 });
 
