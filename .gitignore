@@ -37,6 +37,10 @@ server/node_modules/
 # Windows builds (keep local only)
 windows/
 
+# Bundled Chrome (downloaded during build)
+client/chrome-win64/
+client/chrome-win64.zip
+
 # Environment
 .env
 .env.local

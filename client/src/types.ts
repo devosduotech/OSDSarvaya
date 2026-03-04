@@ -16,7 +16,7 @@ export interface Group {
   contactIds: string[];
 }
 
-export type CampaignStatus = 'Queued' | 'Sending' | 'Sent' | 'Failed' | 'Stopped' | 'Cancelled';
+export type CampaignStatus = 'Queued' | 'Sending' | 'Sent' | 'Failed' | 'Stopped' | 'Cancelled' | 'Scheduled';
 
 export interface Attachment {
   data: string; // base64 encoded string
@@ -49,4 +49,13 @@ export interface CampaignReport {
   read: number;
   failed: number;
   progress: number;
+}
+
+export interface FailedMessage {
+  id: number;
+  campaignRunId: string;
+  contactPhone: string;
+  contactName: string | null;
+  reason: string;
+  createdAt: string;
 }

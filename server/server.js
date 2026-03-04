@@ -14,6 +14,12 @@ const logger = require('./logger');
 const { verifyToken, verifySocketToken } = require('./middleware/auth');
 const dbPromise = require('./database');
 
+// Check if running in Electron and get Chromium path
+function getElectronChromiumPath() {
+  const electron = require('electron');
+  return process.execPath.replace(/\[^.exe\]+/, 'resources\\chrome-win\\chrome.exe').replace('OSDSarvaya.exe', 'chrome-win\\chrome.exe');
+}
+
 // Load production.env explicitly if it exists (for packaged app)
 const productionEnvPath = path.join(__dirname, 'production.env');
 const productionEnvPathParent = path.join(__dirname, '..', 'production.env');
@@ -73,6 +79,12 @@ if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'osdsarvaya_default_secret_key_2024_v1';
   console.log('JWT_SECRET: Using default for Windows');
 }
+
+// Set default ERPNext credentials (same for all deployments)
+process.env.ERPNEXT_URL = process.env.ERPNEXT_URL || 'https://dvarika.osduotech.com';
+process.env.ERPNEXT_API_KEY = process.env.ERPNEXT_API_KEY || 'a652ccfadaa8917';
+process.env.ERPNEXT_API_SECRET = process.env.ERPNEXT_API_SECRET || '155057be1ff06fa';
+
 console.log('=======================');
 
 const { APP_VERSION } = require('./version');
@@ -265,12 +277,16 @@ function changeStatus(newStatus) {
 async function initializeWhatsAppClient() {
 
   if (waClient) return;
-
+  
+  console.error('[WA_INIT] Starting initializeWhatsAppClient...');
+  logger.info('Starting WhatsApp initialization...');
+  
   const maxRetries = 3;
   let attempt = 0;
 
   async function attemptInit() {
     attempt++;
+    console.error(`[WA_INIT] Attempt ${attempt}/${maxRetries}`);
     logger.info(`WhatsApp initialization attempt ${attempt}/${maxRetries}`);
 
     try {
@@ -303,9 +319,32 @@ async function initializeWhatsAppClient() {
         ]
       };
 
+      // Check for bundled Chrome in packaged app
+      if (!puppeteerOptions.executablePath && process.resourcesPath) {
+        const possibleChromePaths = [
+          path.join(process.resourcesPath, 'chrome-win64', 'chrome-win', 'chrome.exe'),
+          path.join(process.resourcesPath, 'app.asar.unpacked', 'chrome-win64', 'chrome-win', 'chrome.exe'),
+          path.join(process.resourcesPath, 'chrome-win64', 'chrome.exe'),
+        ];
+        
+        console.error('[WA_INIT] Checking for bundled Chrome, resourcesPath:', process.resourcesPath);
+        for (const chromePath of possibleChromePaths) {
+          console.error('[WA_INIT] Checking Chrome path:', chromePath, 'exists:', fs.existsSync(chromePath));
+          if (fs.existsSync(chromePath)) {
+            puppeteerOptions.executablePath = chromePath;
+            console.error('[WA_INIT] Using bundled Chrome:', chromePath);
+            logger.info('Using bundled Chrome:', chromePath);
+            break;
+          }
+        }
+      }
+
       if (process.env.PUPPETEER_EXECUTABLE_PATH) {
         puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
       }
+
+      console.error('[WA_INIT] puppeteer executablePath:', puppeteerOptions.executablePath);
+      logger.info('Creating WhatsApp client with puppeteer options...');
 
       waClient = new Client({
         authStrategy: new LocalAuth({ dataPath: getSessionPath() }),
@@ -659,6 +698,41 @@ app.post('/api/campaigns/cancel/:id', verifyToken, async (req, res) => {
   }
 });
 
+app.post('/api/campaigns/cancel-all', verifyToken, async (req, res) => {
+  const db = await dbPromise;
+
+  try {
+    const result = await db.run(
+      "UPDATE campaign_runs SET status = 'Cancelled' WHERE status IN ('Scheduled', 'Queued')"
+    );
+
+    const count = result.changes;
+    logger.info(`Cancelled ${count} scheduled/queued campaigns`);
+    emitActivity('campaigns_cancelled', `${count} scheduled/queued campaigns cancelled`);
+
+    return res.json({ success: true, cancelled: count });
+  } catch (err) {
+    logger.error(err);
+    return res.status(500).json({ success: false });
+  }
+});
+
+app.get('/api/campaigns/failed/:runId', verifyToken, async (req, res) => {
+  const db = await dbPromise;
+  const { runId } = req.params;
+
+  try {
+    const failedMessages = await db.all(
+      `SELECT * FROM failed_messages WHERE campaignRunId = ? ORDER BY createdAt DESC LIMIT 100`,
+      [runId]
+    );
+    return res.json({ success: true, failedMessages });
+  } catch (err) {
+    logger.error(err);
+    return res.status(500).json({ success: false });
+  }
+});
+
 
 // =====================================================
 // CAMPAIGN PROCESS (FINAL)
@@ -758,10 +832,17 @@ async function processRun(runId, templateId, groupIds) {
       acc[key] = isNaN(Number(value)) ? value : Number(value);
       return acc;
     }, {});
-    const messagesPerHour = settingsObj.messagesPerHour || 65;
-    const delayMs = Math.round(3600000 / messagesPerHour);
+    const messagesPerHour = settingsObj.messagesPerHour || 30; // Reduced from 65 to 30 to avoid restrictions
+    const baseDelay = Math.round(3600000 / messagesPerHour);
+    const minMessageDelay = Math.max(baseDelay, 5000); // Minimum 5s delay to prevent disconnection
 
-    logger.info(`Rate limit: ${messagesPerHour} msgs/hour, delay: ${delayMs}ms`);
+    // Helper for random delay with jitter (adds 0-50% randomness to appear more human)
+    const getRandomDelay = (baseMs) => {
+      const jitter = Math.random() * (baseMs * 0.5);
+      return Math.round(baseMs + jitter);
+    };
+
+    logger.info(`Rate limit: ${messagesPerHour} msgs/hour, base delay: ${minMessageDelay}ms with jitter`);
     logger.info(`WhatsApp client status: ${waClient ? 'exists' : 'null'}, info: ${waClient?.info?.wid?._serialized || 'no info'}`);
 
     await db.run(
@@ -795,6 +876,10 @@ async function processRun(runId, templateId, groupIds) {
 
         if (!numberId) {
           logger.warn(`Not registered on WhatsApp: ${formatted}`);
+          await db.run(
+            `INSERT INTO failed_messages (campaignRunId, contactPhone, contactName, reason, createdAt) VALUES (?, ?, ?, ?, ?)`,
+            [runId, contact.phone, contact.name || null, 'Not registered on WhatsApp', new Date().toISOString()]
+          );
           failed++;
           continue;
         }
@@ -851,6 +936,14 @@ async function processRun(runId, templateId, groupIds) {
 
       } catch (err) {
         logger.error({ err, contact: contact.phone }, 'SEND FAILED');
+        
+        // Store failed message with reason
+        const reason = err.message || err.toString() || 'Unknown error';
+        await db.run(
+          `INSERT INTO failed_messages (campaignRunId, contactPhone, contactName, reason, createdAt) VALUES (?, ?, ?, ?, ?)`,
+          [runId, contact.phone, contact.name || null, reason, new Date().toISOString()]
+        );
+        
         failed++;
       }
 
@@ -882,9 +975,9 @@ async function processRun(runId, templateId, groupIds) {
         return;
       }
 
-      // Rate limiting: dynamic delay based on messagesPerHour setting
+      // Rate limiting: dynamic delay with jitter to appear more human
       if (sent + failed < contacts.length) {
-        await new Promise(r => setTimeout(r, delayMs));
+        await new Promise(r => setTimeout(r, getRandomDelay(minMessageDelay)));
       }
     }
 
@@ -948,8 +1041,8 @@ async function processRun(runId, templateId, groupIds) {
           logger.error({ err }, 'RETRY SEND FAILED');
         }
         
-        // Rate limiting for retries too
-        await new Promise(r => setTimeout(r, delayMs));
+        // Rate limiting for retries too (with jitter)
+        await new Promise(r => setTimeout(r, getRandomDelay(minMessageDelay)));
       }
       
       // Update final report
@@ -1012,18 +1105,22 @@ async function processRun(runId, templateId, groupIds) {
 
 // REST API fallback for WhatsApp connection (more reliable on Windows)
 app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
+  console.error('[WA] WhatsApp connect API called, waStatus:', waStatus, 'waClient exists:', !!waClient);
   logger.info(`WhatsApp connect API called, waStatus: ${waStatus}, waClient exists: ${!!waClient}`);
   
-  if (waClient) {
+  if (waClient && waStatus === 'CONNECTED') {
     return res.json({ success: true, status: waStatus, message: 'WhatsApp already connected' });
   }
   
   changeStatus('CONNECTING');
   
   try {
+    console.error('[WA] Calling initializeWhatsAppClient...');
     await initializeWhatsAppClient();
+    console.error('[WA] After init, waStatus:', waStatus);
     return res.json({ success: true, status: waStatus });
   } catch (err) {
+    console.error('[WA] Exception in connect:', err.message);
     logger.error({ err }, 'WhatsApp connect failed');
     changeStatus('FAILED');
     return res.status(500).json({ success: false, message: 'Failed to connect WhatsApp' });

@@ -192,10 +192,10 @@ const Help: React.FC = () => {
       content: `
         <p class="mb-4">Configure how messages are sent in <strong>Settings</strong>:</p>
         <ul class="list-disc list-inside space-y-2 ml-2">
-          <li><strong>Messages per hour</strong>: Control sending speed (default: 65)</li>
+          <li><strong>Messages per hour</strong>: Control sending speed (default: 30)</li>
           <li><strong>Retry failed</strong>: Automatically retry up to 3 times</li>
         </ul>
-        <p class="mt-4">Lower the messages per hour if WhatsApp blocks your messages.</p>
+        <p class="mt-4">Lower the messages per hour if WhatsApp blocks your messages. We recommend staying below 40-50 msgs/hr to avoid restrictions.</p>
       `
     },
     {

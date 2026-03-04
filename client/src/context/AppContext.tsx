@@ -13,7 +13,8 @@ import {
   Group,
   CampaignTemplate,
   CampaignRun,
-  CampaignReport
+  CampaignReport,
+  FailedMessage
 } from '../types';
 
 import io, { Socket } from 'socket.io-client';
@@ -46,6 +47,8 @@ interface AppContextType {
   deleteContact: (id: string) => Promise<boolean>;
   toggleContactOptStatus: (id: string, optedIn: boolean) => Promise<boolean>;
   addContactsBulk: (contacts: Omit<Contact, 'id'>[]) => Promise<boolean>;
+  updateContactsBulk: (contacts: { phone: string; name?: string; email?: string; tags?: string }[]) => Promise<{ updated: number; notFound: number; notFoundPhones?: string[] } | null>;
+  deleteContactsBulk: (ids: string[]) => Promise<boolean>;
 
   addGroup: (group: { name: string; contactIds: string[] }) => Promise<Group | null>;
   updateGroup: (group: Group) => Promise<Group | null>;
@@ -68,6 +71,8 @@ interface AppContextType {
   stopCampaignRun: () => Promise<boolean>;
   scheduleCampaign: (templateId: string, groupIds: string[], scheduledAt: string) => Promise<{ success: boolean; runId: string } | null>;
   cancelQueuedCampaign: (runId: string) => Promise<boolean>;
+  cancelAllScheduledCampaigns: () => Promise<number>;
+  getFailedMessages: (runId: string) => Promise<FailedMessage[]>;
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   toast: { message: string; type: 'success' | 'error' | 'warning' | 'info' } | null;
   setToast: React.Dispatch<React.SetStateAction<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>>;
@@ -366,6 +371,30 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  const updateContactsBulk = async (contacts: { phone: string; name?: string; email?: string; tags?: string }[]) => {
+    try {
+      const result = await apiRequest('/contacts/bulk-update', 'POST', contacts) as { 
+        updated: number; 
+        notFound: number; 
+        notFoundPhones?: string[];
+      };
+      await fetchData();
+      return result;
+    } catch {
+      return null;
+    }
+  };
+
+  const deleteContactsBulk = async (ids: string[]) => {
+    try {
+      await apiRequest('/contacts/bulk', 'DELETE', { ids });
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const addGroup = async (group: { name: string; contactIds: string[] }) => {
     const newGroup = { ...group, id: `group_${Date.now()}` };
     try {
@@ -492,6 +521,25 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       return true;
     } catch {
       return false;
+    }
+  };
+
+  const cancelAllScheduledCampaigns = async () => {
+    try {
+      const result = await apiRequest('/campaigns/cancel-all', 'POST') as { cancelled?: number };
+      await fetchData();
+      return result.cancelled || 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const getFailedMessages = async (runId: string) => {
+    try {
+      const result = await apiRequest(`/campaigns/failed/${runId}`, 'GET') as { failedMessages?: FailedMessage[] };
+      return result.failedMessages || [];
+    } catch {
+      return [];
     }
   };
 
@@ -631,6 +679,8 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     deleteContact,
     toggleContactOptStatus,
     addContactsBulk,
+    updateContactsBulk,
+    deleteContactsBulk,
     addGroup,
     updateGroup,
     deleteGroup,
@@ -647,6 +697,8 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     stopCampaignRun,
     scheduleCampaign,
     cancelQueuedCampaign,
+    cancelAllScheduledCampaigns,
+    getFailedMessages,
     showToast,
     toast,
     setToast,

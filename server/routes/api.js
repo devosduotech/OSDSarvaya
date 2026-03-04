@@ -125,12 +125,15 @@ router.post('/contacts/bulk', async (req, res) => {
     }
     
     if (validContacts.length === 0) {
+        console.log('Bulk import failed:', { total: contacts.length, invalidPhones: invalidPhones.length, duplicates: duplicates.length });
         return res.status(400).json({ 
             message: 'No valid contacts to import.',
             imported: 0,
             skipped: invalidPhones.length + duplicates.length,
             invalidPhones: invalidPhones.length,
-            duplicates: duplicates.length
+            invalidPhoneSamples: invalidPhones.slice(0, 5),
+            duplicates: duplicates.length,
+            duplicateSamples: duplicates.slice(0, 5)
         });
     }
     
@@ -150,6 +153,72 @@ router.post('/contacts/bulk', async (req, res) => {
     } catch (err) {
         logger.error({ err }, "Failed to bulk import contacts");
         res.status(500).json({ message: 'Error importing contacts.' });
+    }
+});
+
+router.post('/contacts/bulk-update', async (req, res) => {
+    const contacts = req.body;
+    const db = await dbPromise;
+    
+    const updated = [];
+    const notFound = [];
+    const errors = [];
+    
+    for (const c of contacts) {
+        if (!c.phone) {
+            errors.push({ phone: c.phone, reason: 'Missing phone number' });
+            continue;
+        }
+        
+        const normalized = normalizePhone(c.phone);
+        
+        const existing = await db.get("SELECT id FROM contacts WHERE phone = ?", [normalized]);
+        
+        if (!existing) {
+            notFound.push(normalized);
+            continue;
+        }
+        
+        try {
+            await db.run(
+                "UPDATE contacts SET name = ?, email = ?, tags = ? WHERE phone = ?",
+                [c.name || '', c.email || '', c.tags || '', normalized]
+            );
+            updated.push(normalized);
+        } catch (err) {
+            errors.push({ phone: normalized, reason: err.message });
+        }
+    }
+    
+    res.json({ 
+        success: true,
+        updated: updated.length,
+        notFound: notFound.length,
+        notFoundPhones: notFound.slice(0, 20),
+        errors: errors.length,
+        errorSamples: errors.slice(0, 5)
+    });
+});
+
+router.delete('/contacts/bulk', async (req, res) => {
+    const { ids } = req.body;
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: 'No contact IDs provided' });
+    }
+    
+    try {
+        const db = await dbPromise;
+        const placeholders = ids.map(() => '?').join(',');
+        const result = await db.run(`DELETE FROM contacts WHERE id IN (${placeholders})`, ids);
+        
+        res.json({ 
+            success: true,
+            deleted: result.changes
+        });
+    } catch (err) {
+        logger.error({ err }, "Failed to bulk delete contacts");
+        res.status(500).json({ message: 'Error deleting contacts' });
     }
 });
 
