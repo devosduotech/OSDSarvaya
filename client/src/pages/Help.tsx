@@ -17,9 +17,6 @@ const Help: React.FC = () => {
         </ol>
         <p class="mt-4 text-yellow-400">Important: The license is tied to your machine. If you change computers, contact support for license transfer.</p>
         <p class="mt-2 text-gray-400">Your machine ID is automatically generated from hardware identifiers for security purposes.</p>
-        <div class="mt-4 p-3 bg-blue-900/30 border border-blue-500 rounded">
-          <p class="text-blue-300"><strong>Demo License:</strong> OSDS-8C3T-3GY3-UXYH with email info@osduotech.com</p>
-        </div>
       `
     },
     {
