@@ -278,11 +278,15 @@ async function initializeWhatsAppClient() {
 
   if (waClient) return;
   
+  console.error('[WA_INIT] Starting initializeWhatsAppClient...');
+  logger.info('Starting WhatsApp initialization...');
+  
   const maxRetries = 3;
   let attempt = 0;
 
   async function attemptInit() {
     attempt++;
+    console.error(`[WA_INIT] Attempt ${attempt}/${maxRetries}`);
     logger.info(`WhatsApp initialization attempt ${attempt}/${maxRetries}`);
 
     try {
@@ -315,10 +319,31 @@ async function initializeWhatsAppClient() {
         ]
       };
 
+      // Check for bundled Chrome in packaged app
+      if (!puppeteerOptions.executablePath && process.resourcesPath) {
+        const possibleChromePaths = [
+          path.join(process.resourcesPath, 'chrome-win64', 'chrome-win', 'chrome.exe'),
+          path.join(process.resourcesPath, 'app.asar.unpacked', 'chrome-win64', 'chrome-win', 'chrome.exe'),
+          path.join(process.resourcesPath, 'chrome-win64', 'chrome.exe'),
+        ];
+        
+        console.error('[WA_INIT] Checking for bundled Chrome, resourcesPath:', process.resourcesPath);
+        for (const chromePath of possibleChromePaths) {
+          console.error('[WA_INIT] Checking Chrome path:', chromePath, 'exists:', fs.existsSync(chromePath));
+          if (fs.existsSync(chromePath)) {
+            puppeteerOptions.executablePath = chromePath;
+            console.error('[WA_INIT] Using bundled Chrome:', chromePath);
+            logger.info('Using bundled Chrome:', chromePath);
+            break;
+          }
+        }
+      }
+
       if (process.env.PUPPETEER_EXECUTABLE_PATH) {
         puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
       }
 
+      console.error('[WA_INIT] puppeteer executablePath:', puppeteerOptions.executablePath);
       logger.info('Creating WhatsApp client with puppeteer options...');
 
       waClient = new Client({
@@ -1080,6 +1105,7 @@ async function processRun(runId, templateId, groupIds) {
 
 // REST API fallback for WhatsApp connection (more reliable on Windows)
 app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
+  console.error('[WA] WhatsApp connect API called, waStatus:', waStatus, 'waClient exists:', !!waClient);
   logger.info(`WhatsApp connect API called, waStatus: ${waStatus}, waClient exists: ${!!waClient}`);
   
   if (waClient && waStatus === 'CONNECTED') {
@@ -1089,9 +1115,12 @@ app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
   changeStatus('CONNECTING');
   
   try {
+    console.error('[WA] Calling initializeWhatsAppClient...');
     await initializeWhatsAppClient();
+    console.error('[WA] After init, waStatus:', waStatus);
     return res.json({ success: true, status: waStatus });
   } catch (err) {
+    console.error('[WA] Exception in connect:', err.message);
     logger.error({ err }, 'WhatsApp connect failed');
     changeStatus('FAILED');
     return res.status(500).json({ success: false, message: 'Failed to connect WhatsApp' });
