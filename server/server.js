@@ -79,6 +79,12 @@ if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'osdsarvaya_default_secret_key_2024_v1';
   console.log('JWT_SECRET: Using default for Windows');
 }
+
+// Set default ERPNext credentials (same for all deployments)
+process.env.ERPNEXT_URL = process.env.ERPNEXT_URL || 'https://dvarika.osduotech.com';
+process.env.ERPNEXT_API_KEY = process.env.ERPNEXT_API_KEY || 'a652ccfadaa8917';
+process.env.ERPNEXT_API_SECRET = process.env.ERPNEXT_API_SECRET || '155057be1ff06fa';
+
 console.log('=======================');
 
 const { APP_VERSION } = require('./version');

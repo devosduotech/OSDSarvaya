@@ -6,8 +6,8 @@ const logger = require('../logger');
 const { getMachineId } = require('../utils/machineId');
 
 const ERPNEXT_URL = process.env.ERPNEXT_URL || 'https://dvarika.osduotech.com';
-const ERPNEXT_API_KEY = process.env.ERPNEXT_API_KEY;
-const ERPNEXT_API_SECRET = process.env.ERPNEXT_API_SECRET;
+const ERPNEXT_API_KEY = process.env.ERPNEXT_API_KEY || 'a652ccfadaa8917';
+const ERPNEXT_API_SECRET = process.env.ERPNEXT_API_SECRET || '155057be1ff06fa';
 const GRACE_PERIOD_HOURS = 24;
 
 async function callERPNext(method, data) {
