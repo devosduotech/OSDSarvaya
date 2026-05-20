@@ -30,7 +30,14 @@ function saveDatabase() {
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
-            fs.writeFileSync(getDbPath(), buffer);
+
+            // Create a backup of the current db file before writing new data
+            const dbPath = getDbPath();
+            if (fs.existsSync(dbPath)) {
+                fs.copyFileSync(dbPath, dbPath + '.bak');
+            }
+
+            fs.writeFileSync(dbPath, buffer);
         } catch (e) {
             logger.error({ e }, 'Failed to save database');
         }

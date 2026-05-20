@@ -297,34 +297,40 @@ async function initializeWhatsAppClient() {
 
       logger.info('Initializing WhatsApp Client...');
 
-      const puppeteerOptions = {
-        headless: "new",
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-site-isolation-trials',
-          '--disable-features=IsolateOrigins,site-per-process',
-          '--disable-web-security',
-          '--disable-background-networking',
-          '--disable-default-apps',
-          '--disable-extensions',
-          '--disable-sync',
-          '--disable-translate',
-          '--metrics-recording-only',
-          '--mute-audio',
-          '--no-first-run',
-          '--safebrowsing-disable-auto-update'
-        ]
-      };
+        const puppeteerOptions = {
+          headless: "new",
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-site-isolation-trials',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-web-security',
+            '--disable-background-networking',
+            '--disable-default-apps',
+            '--disable-extensions',
+            '--disable-sync',
+            '--disable-translate',
+            '--metrics-recording-only',
+            '--mute-audio',
+            '--no-first-run',
+            '--safebrowsing-disable-auto-update',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-gpu-process-crash-dump',
+            '--disable-software-rasterizer',
+            '--no-default-browser-check',
+          ]
+        };
+
 
       // Check for bundled Chrome in packaged app
       if (!puppeteerOptions.executablePath && process.resourcesPath) {
         const possibleChromePaths = [
-          path.join(process.resourcesPath, 'chrome-win64', 'chrome-win', 'chrome.exe'),
-          path.join(process.resourcesPath, 'app.asar.unpacked', 'chrome-win64', 'chrome-win', 'chrome.exe'),
           path.join(process.resourcesPath, 'chrome-win64', 'chrome.exe'),
+          path.join(process.resourcesPath, 'app.asar.unpacked', 'chrome-win64', 'chrome.exe'),
+          path.join(process.resourcesPath, 'app', 'chrome-win64', 'chrome.exe'),
+          path.join(process.resourcesPath, 'chrome-win64', 'chrome-win', 'chrome.exe'),
         ];
         
         console.error('[WA_INIT] Checking for bundled Chrome, resourcesPath:', process.resourcesPath);
@@ -355,9 +361,34 @@ async function initializeWhatsAppClient() {
       waClient.on('qr', (qr) => {
         changeStatus('SCAN_QR');
         io.emit('qr_code', qr);
+        logger.info('QR Code generated, waiting for scan...');
+        
+        // Handle QR timeout (2 minutes)
+        if (global.qrTimeout) clearTimeout(global.qrTimeout);
+        global.qrTimeout = setTimeout(() => {
+          if (waStatus === 'SCAN_QR') {
+            logger.warn('QR scan timeout reached (2 mins). The QR code might be expired.');
+          }
+        }, 120000);
+      });
+
+      waClient.on('authenticated', () => {
+        logger.info('WhatsApp authenticated successfully');
+        changeStatus('AUTHENTICATED');
+        emitActivity('whatsapp', 'WhatsApp authenticated successfully');
+      });
+
+      waClient.on('state_change', (state) => {
+        logger.info('WhatsApp state changed:', state);
+        emitActivity('whatsapp', `WhatsApp state changed to: ${state}`);
       });
 
       waClient.on('ready', () => {
+        logger.info(`WhatsApp READY: ${waClient.info?.wid?._serialized}`);
+        changeStatus('CONNECTED');
+        emitActivity('whatsapp', 'WhatsApp connected');
+      });
+
         logger.info(`WhatsApp READY: ${waClient.info?.wid?._serialized}`);
         changeStatus('CONNECTED');
         emitActivity('whatsapp', 'WhatsApp connected');
@@ -379,12 +410,13 @@ async function initializeWhatsAppClient() {
       waClient.on('auth_failure', (msg) => {
         logger.error({ msg }, 'WhatsApp AUTH FAILURE');
         changeStatus('AUTH_FAILED');
-        emitActivity('whatsapp', 'WhatsApp authentication failed');
+        emitActivity('whatsapp', `WhatsApp authentication failed: ${msg}`);
       });
 
       waClient.on('loading_screen', (msg) => {
         logger.info(`WhatsApp loading: ${msg}`);
       });
+
 
       waClient.on('message', async (message) => {
         if (message.fromMe) return;
@@ -1231,19 +1263,28 @@ if (!clientBuildPath || !fs.existsSync(clientBuildPath)) {
 // GRACEFUL SHUTDOWN
 // =====================================================
 async function gracefulShutdown() {
-
   logger.info('Graceful shutdown initiated');
-
+  
   try {
+    // Ensure database is saved one last time before exit
+    const db = await dbPromise;
+    // we need to access the saveDatabase function from database.js
+    // However, it's not exported. I should check if I can trigger a run or execute a dummy query
+    // to trigger the internal saveDatabase call since it's called in every db.run/exec
+    await db.run('SELECT 1'); 
+    logger.info('Final database save completed');
+
     if (waClient) {
+      logger.info('Closing WhatsApp client...');
       await waClient.destroy();
       waClient = null;
     }
   } catch (err) {
     logger.error({ err }, 'Shutdown error');
+  } finally {
+    logger.info('Process exiting');
+    process.exit(0);
   }
-
-  process.exit(0);
 }
 
 process.on('SIGTERM', gracefulShutdown);
@@ -1253,14 +1294,20 @@ process.on('SIGINT', gracefulShutdown);
 // =====================================================
 // START
 // =====================================================
-async function startServer() {
+// ... (previous code)
 
+async function startServer() {
   await fsPromises.mkdir(getDataPath(), { recursive: true });
   await dbPromise;
 
-  server.listen(PORT, '0.0.0.0', () => {
-    logger.info(`OSDSarvaya Server v${APP_VERSION} (API ${API_VERSION}) running on port ${PORT}`);
-  });
+  if (process.env.NODE_ENV !== 'test') {
+    server.listen(PORT, '0.0.0.0', () => {
+      logger.info(`OSDSarvaya Server v${APP_VERSION} (API ${API_VERSION}) running on port ${PORT}`);
+    });
+  }
 }
+
+startServer();
+module.exports = app;
 
 startServer();

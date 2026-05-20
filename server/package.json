@@ -4,7 +4,8 @@
   "description": "Backend server for OSDSarvaya WhatsApp application.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "jest"
   },
   "license": "ISC",
   "dependencies": {
