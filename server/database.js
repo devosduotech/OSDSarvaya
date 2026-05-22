@@ -265,6 +265,64 @@ const initializeDb = async () => {
             )
         `);
 
+        // API Keys table for third-party notification API access
+        db.run(`
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                key_hash TEXT NOT NULL UNIQUE,
+                key_prefix TEXT NOT NULL,
+                rate_limit INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT NOT NULL,
+                last_used_at TEXT
+            )
+        `);
+
+        // Webhooks table for event notifications
+        db.run(`
+            CREATE TABLE IF NOT EXISTS webhooks (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                url TEXT NOT NULL,
+                secret TEXT NOT NULL,
+                events TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT NOT NULL,
+                api_key_id TEXT
+            )
+        `);
+
+        // Notification log for API-driven messages
+        db.run(`
+            CREATE TABLE IF NOT EXISTS notification_log (
+                id TEXT PRIMARY KEY,
+                api_key_id TEXT,
+                api_key_name TEXT,
+                recipient_phone TEXT NOT NULL,
+                recipient_name TEXT,
+                message TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                campaign_run_id TEXT,
+                external_id TEXT,
+                error TEXT,
+                created_at TEXT NOT NULL,
+                delivered_at TEXT
+            )
+        `);
+
+        // Add external_id column to campaign_runs if not exists (for API tracking)
+        try {
+            db.run('ALTER TABLE campaign_runs ADD COLUMN external_id TEXT');
+        } catch (e) {
+            // Column already exists, ignore
+        }
+
+        // v2 migrations: ensure new tables exist for upgrades from v1
+        try { db.run(`CREATE TABLE IF NOT EXISTS api_keys (id TEXT PRIMARY KEY, name TEXT NOT NULL, key_hash TEXT NOT NULL UNIQUE, key_prefix TEXT NOT NULL, rate_limit INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1, created_at TEXT NOT NULL, last_used_at TEXT)`); } catch (e) { /* exists */ }
+        try { db.run(`CREATE TABLE IF NOT EXISTS webhooks (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, secret TEXT NOT NULL, events TEXT NOT NULL, is_active INTEGER DEFAULT 1, created_at TEXT NOT NULL, api_key_id TEXT)`); } catch (e) { /* exists */ }
+        try { db.run(`CREATE TABLE IF NOT EXISTS notification_log (id TEXT PRIMARY KEY, api_key_id TEXT, api_key_name TEXT, recipient_phone TEXT NOT NULL, recipient_name TEXT, message TEXT, status TEXT NOT NULL DEFAULT 'pending', campaign_run_id TEXT, external_id TEXT, error TEXT, created_at TEXT NOT NULL, delivered_at TEXT)`); } catch (e) { /* exists */ }
+
         db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('messagesPerHour', '30')");
         db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('maxRetries', '3')");
 

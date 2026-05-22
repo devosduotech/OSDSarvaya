@@ -45,7 +45,22 @@ router.get('/data', async (req, res) => {
             db.all("SELECT * FROM settings"),
             db.all("SELECT * FROM activities ORDER BY createdAt DESC LIMIT 100")
         ]);
-        
+
+        // Fetch v2 data (may not exist in older DBs)
+        let apiKeys = [];
+        let webhooks = [];
+        let notificationLogs = [];
+        try {
+            apiKeys = await db.all("SELECT id, name, key_prefix, rate_limit, is_active, created_at, last_used_at FROM api_keys ORDER BY created_at DESC");
+        } catch (e) { /* table may not exist yet */ }
+        try {
+            const webhooksRaw = await db.all("SELECT * FROM webhooks ORDER BY created_at DESC");
+            webhooks = webhooksRaw.map(w => ({...w, events: JSON.parse(w.events || '[]')}));
+        } catch (e) { /* table may not exist yet */ }
+        try {
+            notificationLogs = await db.all("SELECT * FROM notification_log ORDER BY created_at DESC LIMIT 200");
+        } catch (e) { /* table may not exist yet */ }
+
         // Post-process groups to handle null contactIds for empty groups
         const processedGroups = groups.map(g => ({...g, contactIds: JSON.parse(g.contactIds || '[]').filter(id => id !== null) }));
         const settingsObj = settings.reduce((acc, { key, value }) => { acc[key] = isNaN(Number(value)) ? value : Number(value); return acc; }, {});
@@ -57,7 +72,22 @@ router.get('/data', async (req, res) => {
             campaignRuns: runs.map(r => ({...r, targetGroupIds: JSON.parse(r.targetGroupIds)})), 
             reports, 
             settings: settingsObj,
-            activities
+            activities,
+            apiKeys,
+            webhooks,
+            notificationLogs: notificationLogs.map(l => ({
+                id: l.id,
+                apiKeyId: l.api_key_id,
+                apiKeyName: l.api_key_name,
+                recipientPhone: l.recipient_phone,
+                recipientName: l.recipient_name,
+                message: l.message ? l.message.substring(0, 500) : null,
+                status: l.status,
+                externalId: l.external_id,
+                error: l.error,
+                createdAt: l.created_at,
+                deliveredAt: l.delivered_at
+            }))
         });
     } catch (err) {
         logger.error({ err }, "Failed to fetch all data");

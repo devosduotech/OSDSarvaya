@@ -14,7 +14,10 @@ import {
   CampaignTemplate,
   CampaignRun,
   CampaignReport,
-  FailedMessage
+  FailedMessage,
+  ApiKey,
+  Webhook,
+  NotificationLog
 } from '../types';
 
 import io, { Socket } from 'socket.io-client';
@@ -85,6 +88,18 @@ interface AppContextType {
   resetWhatsApp: () => void;
   isCampaignRunning: boolean;
 
+  apiKeys: ApiKey[];
+  webhooks: Webhook[];
+  notificationLogs: NotificationLog[];
+  availableWebhookEvents: string[];
+  createApiKey: (name: string) => Promise<{ success: boolean; apiKey?: any; message?: string }>;
+  toggleApiKey: (id: string, isActive: boolean) => Promise<boolean>;
+  deleteApiKey: (id: string) => Promise<boolean>;
+  createWebhook: (data: { name: string; url: string; events: string[] }) => Promise<{ success: boolean; webhook?: Webhook; message?: string }>;
+  updateWebhook: (id: string, data: Partial<Webhook>) => Promise<boolean>;
+  deleteWebhook: (id: string) => Promise<boolean>;
+  testWebhook: (id: string) => Promise<{ success: boolean; message: string }>;
+
   handleExport: () => void;
   handleImport: (file: File) => Promise<void>;
 }
@@ -104,6 +119,16 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   const [reports, setReports] = useState<CampaignReport[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [settings, setSettings] = useState({ messagesPerHour: 65 });
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
+  const [availableWebhookEvents] = useState<string[]>([
+    'message.sent',
+    'message.failed',
+    'campaign.started',
+    'campaign.completed',
+    'campaign.stopped'
+  ]);
 
   const [token, setToken] = useLocalStorage<string | null>('osdsarvaya_token', null);
   const isAuthenticated = !!token;
@@ -130,6 +155,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // =========================
   const apiRequest = async <T,>(endpoint: string, method: string, body?: any): Promise<T> => {
     setAppError(null);
+    console.log(`apiRequest: ${method} /api${endpoint}`, body);
 
     const response = await fetch(`${BACKEND_URL}/api${endpoint}`, {
       method,
@@ -140,8 +166,11 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       body: body ? JSON.stringify(body) : undefined
     });
 
+    console.log(`apiRequest: ${method} /api${endpoint} status=${response.status}`);
+
     if (!response.ok) {
       const err = await response.json();
+      console.error(`apiRequest error:`, err);
       throw new Error(err.message || 'API error');
     }
 
@@ -167,6 +196,9 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
         reports: CampaignReport[];
         settings: { messagesPerHour: number };
         activities?: Activity[];
+        apiKeys?: ApiKey[];
+        webhooks?: Webhook[];
+        notificationLogs?: NotificationLog[];
       }>('/data', 'GET');
 
       setContacts(data.contacts);
@@ -178,6 +210,15 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       
       if (data.activities) {
         setActivities(data.activities);
+      }
+      if (data.apiKeys) {
+        setApiKeys(data.apiKeys);
+      }
+      if (data.webhooks) {
+        setWebhooks(data.webhooks);
+      }
+      if (data.notificationLogs) {
+        setNotificationLogs(data.notificationLogs);
       }
 
       // Fetch version from server (for display only, actual version from package.json)
@@ -663,6 +704,88 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  // =========================
+  // API KEYS
+  // =========================
+  const createApiKey = async (name: string): Promise<{ success: boolean; apiKey?: any; message?: string }> => {
+    try {
+      console.log('createApiKey: starting request for', name);
+      const res = await apiRequest<any>('/api-keys', 'POST', { name });
+      console.log('createApiKey: response', res);
+      if (res && res.success) {
+        await fetchData();
+      }
+      return res;
+    } catch (err: any) {
+      console.error('createApiKey: error', err);
+      return { success: false, message: err.message || 'Failed to create API key' };
+    }
+  };
+
+  const toggleApiKey = async (id: string, isActive: boolean): Promise<boolean> => {
+    try {
+      await apiRequest(`/api-keys/${id}`, 'PUT', { isActive });
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const deleteApiKey = async (id: string): Promise<boolean> => {
+    try {
+      await apiRequest(`/api-keys/${id}`, 'DELETE');
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // =========================
+  // WEBHOOKS
+  // =========================
+  const createWebhook = async (data: { name: string; url: string; events: string[] }): Promise<{ success: boolean; webhook?: Webhook; message?: string }> => {
+    try {
+      const res = await apiRequest<any>('/webhooks', 'POST', data);
+      if (res.success) {
+        await fetchData();
+      }
+      return res;
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to create webhook' };
+    }
+  };
+
+  const updateWebhook = async (id: string, data: Partial<Webhook>): Promise<boolean> => {
+    try {
+      await apiRequest(`/webhooks/${id}`, 'PUT', data);
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const deleteWebhook = async (id: string): Promise<boolean> => {
+    try {
+      await apiRequest(`/webhooks/${id}`, 'DELETE');
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const testWebhook = async (id: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await apiRequest<any>(`/webhooks/${id}/test`, 'POST');
+      return { success: res.success, message: res.message || 'Test completed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Test failed' };
+    }
+  };
+
   const value = {
     contacts,
     groups,
@@ -710,6 +833,18 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     connectWhatsApp,
     disconnectWhatsApp,
     resetWhatsApp,
+
+    apiKeys,
+    webhooks,
+    notificationLogs,
+    availableWebhookEvents,
+    createApiKey,
+    toggleApiKey,
+    deleteApiKey,
+    createWebhook,
+    updateWebhook,
+    deleteWebhook,
+    testWebhook,
 
     handleExport,
     handleImport

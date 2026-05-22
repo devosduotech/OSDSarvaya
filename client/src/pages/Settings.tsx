@@ -6,6 +6,8 @@ import Button from '../components/ui/Button';
 import { UploadIcon } from '../components/icons/Icons';
 import { getVersion } from '../version';
 import { licenseService } from '../services/license';
+import ApiKeysManager from '../components/ApiKeysManager';
+import WebhooksManager from '../components/WebhooksManager';
 
 const Settings: React.FC = () => {
 
@@ -20,8 +22,20 @@ const Settings: React.FC = () => {
     resetWhatsApp,
     logout,
     handleExport,
-    handleImport
+    handleImport,
+    apiKeys,
+    webhooks,
+    availableWebhookEvents,
+    createApiKey,
+    toggleApiKey,
+    deleteApiKey,
+    createWebhook,
+    updateWebhook,
+    deleteWebhook,
+    testWebhook
   } = useAppContext();
+
+  const [activeTab, setActiveTab] = useState<'whatsapp' | 'api' | 'webhooks' | 'general'>('whatsapp');
 
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [localSettings, setLocalSettings] = useState(settings);
@@ -59,9 +73,7 @@ const Settings: React.FC = () => {
   }, [qrCode, whatsAppStatus]);
 
   const handleChangePassword = async () => {
-
     const token = localStorage.getItem('token');
-
     setIsChangingPassword(true);
     const res = await fetch('/api/change-password', {
       method: 'POST',
@@ -69,14 +81,9 @@ const Settings: React.FC = () => {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({
-        oldPassword,
-        newPassword
-      })
+      body: JSON.stringify({ oldPassword, newPassword })
     });
-
     const data = await res.json();
-
     if (data.success) {
       alert('Password updated successfully');
       setOldPassword('');
@@ -104,11 +111,9 @@ const Settings: React.FC = () => {
   const onImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     if (window.confirm('This will overwrite all data. Continue?')) {
       await handleImport(file);
     }
-
     if (backupFileRef.current) backupFileRef.current.value = "";
   };
 
@@ -129,259 +134,225 @@ const Settings: React.FC = () => {
       ? 'bg-red-500'
       : 'bg-gray-400';
 
-  return (
-    <div className="p-6 bg-gray-50 dark:bg-slate-900 min-h-screen space-y-6 max-w-3xl mx-auto">
+  const tabs = [
+    { id: 'whatsapp' as const, label: 'WhatsApp' },
+    { id: 'api' as const, label: 'API Keys' },
+    { id: 'webhooks' as const, label: 'Webhooks' },
+    { id: 'general' as const, label: 'General' },
+  ];
 
-      {/* HEADER */}
+  return (
+    <div className="p-6 bg-gray-50 dark:bg-slate-900 min-h-screen max-w-4xl mx-auto">
+
       <Card>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mb-4">
           <div>
             <h2 className="text-xl font-semibold dark:text-white">Settings</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Manage application configuration
             </p>
           </div>
-
           <Button variant="secondary" onClick={logout}>
             Logout
           </Button>
         </div>
-      </Card>
 
-      {/* BACKUP */}
-      <Card>
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold dark:text-white">Backup & Restore</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Export or import your application data
-          </p>
-
-          <div className="flex gap-3">
-            <Button onClick={handleExport}>
-              Export Data
-            </Button>
-
-            <Button
-              variant="secondary"
-              icon={<UploadIcon className="w-4 h-4" />}
-              onClick={() => backupFileRef.current?.click()}
+        {/* Tabs */}
+        <div className="flex gap-1 border-b dark:border-slate-700">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
             >
-              Import Data
-            </Button>
-
-            <input
-              type="file"
-              ref={backupFileRef}
-              onChange={onImport}
-              accept=".json"
-              className="hidden"
-            />
-          </div>
+              {tab.label}
+            </button>
+          ))}
         </div>
       </Card>
 
-      {/* WHATSAPP */}
-      <Card>
-        <div className="space-y-5">
+      {/* WHATSAPP TAB */}
+      {activeTab === 'whatsapp' && (
+        <Card className="mt-4">
+          <div className="space-y-5">
+            <h3 className="text-lg font-semibold dark:text-white">WhatsApp Connection</h3>
 
-          <h3 className="text-lg font-semibold dark:text-white">WhatsApp Connection</h3>
-
-          {/* STATUS */}
-          <div className="flex justify-between items-center p-4 border rounded-lg bg-gray-50 dark:bg-slate-700 dark:border-slate-600">
-
-            <div className="flex items-center gap-3">
-              <span className={`h-3 w-3 rounded-full ${statusColor}`}></span>
-
-              <span className="text-sm font-medium dark:text-white">
-                Status: <b>{getStatus()}</b>
-              </span>
-            </div>
-
-            <div className="flex gap-2">
-
-              {isWhatsAppConnected ? (
-                <Button variant="danger" onClick={disconnectWhatsApp}>
-                  Disconnect
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    onClick={connectWhatsApp}
-                    disabled={whatsAppStatus === 'CONNECTING' || whatsAppStatus === 'SCAN_QR'}
-                  >
-                    Connect
-                  </Button>
-
-                  {(whatsAppStatus === 'FAILED' || whatsAppStatus === 'DISCONNECTED') && (
-                    <Button variant="secondary" onClick={resetWhatsApp}>
-                      Reset
-                    </Button>
-                  )}
-                </>
-              )}
-
-            </div>
-          </div>
-
-          {/* QR */}
-          {whatsAppStatus === 'SCAN_QR' && (
-            <div className="text-center border-t dark:border-slate-600 pt-6 space-y-3">
-
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Scan QR using WhatsApp on your phone
-              </p>
-
-              <div className="inline-block p-4 bg-white dark:bg-slate-700 rounded-lg shadow">
-                {qrCodeDataUrl
-                  ? <img src={qrCodeDataUrl} className="w-64 h-64" />
-                  : <div className="w-64 h-64 bg-gray-200 dark:bg-slate-600 animate-pulse rounded" />
-                }
-              </div>
-
-            </div>
-          )}
-
-          {/* ERROR */}
-          {whatsAppStatus === 'FAILED' && (
-            <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-400">
-              WhatsApp connection failed. Check server logs.
-            </div>
-          )}
-
-        </div>
-      </Card>
-
-      {/* RATE */}
-      <Card>
-        <div className="space-y-5">
-
-          <h3 className="text-lg font-semibold dark:text-white">Messaging Rate</h3>
-
-          <div>
-            <label className="text-sm font-medium dark:text-gray-200">
-              Messages per Hour
-            </label>
-
-            <div className="flex items-center gap-4 mt-2">
-
-              <input
-                type="range"
-                min="10"
-                max="120"
-                step="5"
-                value={localSettings.messagesPerHour}
-                onChange={handleRateChange}
-                className="w-full"
-              />
-
-              <input
-                type="number"
-                value={localSettings.messagesPerHour}
-                onChange={handleRateChange}
-                className="w-20 p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-              />
-
-            </div>
-
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-              Recommended: 60–70 messages/hour
-            </p>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={handleSettingsSave} loading={isSavingSettings}>
-              Save Settings
-            </Button>
-          </div>
-
-        </div>
-      </Card>
-
-      {/* SECURITY */}
-      <Card>
-        <div className="pt-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Security
-          </h3>
-
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Change your login password.
-          </p>
-
-          <div className="mt-4 space-y-3">
-
-            <input
-              type="password"
-              placeholder="Current Password"
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-              value={oldPassword}
-              onChange={(e) => setOldPassword(e.target.value)}
-            />
-
-            <input
-              type="password"
-              placeholder="New Password"
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-
-            <div className="flex justify-end">
-              <Button onClick={handleChangePassword} loading={isChangingPassword}>
-                Update Password
-              </Button>
-            </div>
-
-          </div>
-        </div>
-      </Card>
-
-      {/* LICENSE & ABOUT */}
-      <Card>
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold dark:text-white">License & About</h3>
-          
-          {/* License Status */}
-          <div className="p-4 border rounded-lg bg-gray-50 dark:bg-slate-700 dark:border-slate-600">
-            <div className="flex items-center justify-between">
+            <div className="flex justify-between items-center p-4 border rounded-lg bg-gray-50 dark:bg-slate-700 dark:border-slate-600">
               <div className="flex items-center gap-3">
-                <span className={`h-3 w-3 rounded-full ${licenseStatus?.activated ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                <span className={`h-3 w-3 rounded-full ${statusColor}`}></span>
                 <span className="text-sm font-medium dark:text-white">
-                  License: <b>{licenseStatus?.activated ? 'Active' : 'Not Active'}</b>
+                  Status: <b>{getStatus()}</b>
                 </span>
               </div>
+              <div className="flex gap-2">
+                {isWhatsAppConnected ? (
+                  <Button variant="danger" onClick={disconnectWhatsApp}>
+                    Disconnect
+                  </Button>
+                ) : (
+                  <>
+                    <Button onClick={connectWhatsApp} disabled={whatsAppStatus === 'CONNECTING' || whatsAppStatus === 'SCAN_QR'}>
+                      Connect
+                    </Button>
+                    {(whatsAppStatus === 'FAILED' || whatsAppStatus === 'DISCONNECTED') && (
+                      <Button variant="secondary" onClick={resetWhatsApp}>
+                        Reset
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            
-            {licenseStatus?.activated && (
-              <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">License Key</span>
-                  <p className="font-semibold dark:text-white">{licenseStatus.licenseKey}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Email</span>
-                  <p className="font-semibold dark:text-white">{licenseStatus.customerEmail}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Activated On</span>
-                  <p className="font-semibold dark:text-white">
-                    {licenseStatus.activationDate ? new Date(licenseStatus.activationDate).toLocaleDateString() : 'N/A'}
-                  </p>
+
+            {whatsAppStatus === 'SCAN_QR' && (
+              <div className="text-center border-t dark:border-slate-600 pt-6 space-y-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Scan QR using WhatsApp on your phone
+                </p>
+                <div className="inline-block p-4 bg-white dark:bg-slate-700 rounded-lg shadow">
+                  {qrCodeDataUrl
+                    ? <img src={qrCodeDataUrl} className="w-64 h-64" />
+                    : <div className="w-64 h-64 bg-gray-200 dark:bg-slate-600 animate-pulse rounded" />
+                  }
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Version Info */}
-          <div className="text-sm">
-            <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
-              <span className="text-gray-500 dark:text-gray-400">Application Version</span>
-              <p className="font-semibold dark:text-white">{getVersion()}</p>
-            </div>
+            {whatsAppStatus === 'FAILED' && (
+              <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-400">
+                WhatsApp connection failed. Check server logs.
+              </div>
+            )}
           </div>
+        </Card>
+      )}
+
+      {/* API KEYS TAB */}
+      {activeTab === 'api' && (
+        <div className="mt-4">
+          <ApiKeysManager
+            apiKeys={apiKeys}
+            onCreateKey={createApiKey}
+            onToggleKey={toggleApiKey}
+            onDeleteKey={deleteApiKey}
+          />
         </div>
-      </Card>
+      )}
 
+      {/* WEBHOOKS TAB */}
+      {activeTab === 'webhooks' && (
+        <div className="mt-4">
+          <WebhooksManager
+            webhooks={webhooks}
+            availableEvents={availableWebhookEvents}
+            onCreateWebhook={createWebhook}
+            onUpdateWebhook={updateWebhook}
+            onDeleteWebhook={deleteWebhook}
+            onTestWebhook={testWebhook}
+          />
+        </div>
+      )}
+
+      {/* GENERAL TAB */}
+      {activeTab === 'general' && (
+        <div className="mt-4 space-y-6">
+
+          {/* BACKUP */}
+          <Card>
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold dark:text-white">Backup & Restore</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Export or import your application data
+              </p>
+              <div className="flex gap-3">
+                <Button onClick={handleExport}>Export Data</Button>
+                <Button variant="secondary" icon={<UploadIcon className="w-4 h-4" />} onClick={() => backupFileRef.current?.click()}>
+                  Import Data
+                </Button>
+                <input type="file" ref={backupFileRef} onChange={onImport} accept=".json" className="hidden" />
+              </div>
+            </div>
+          </Card>
+
+          {/* RATE */}
+          <Card>
+            <div className="space-y-5">
+              <h3 className="text-lg font-semibold dark:text-white">Messaging Rate</h3>
+              <div>
+                <label className="text-sm font-medium dark:text-gray-200">Messages per Hour</label>
+                <div className="flex items-center gap-4 mt-2">
+                  <input type="range" min="10" max="120" step="5" value={localSettings.messagesPerHour} onChange={handleRateChange} className="w-full" />
+                  <input type="number" value={localSettings.messagesPerHour} onChange={handleRateChange} className="w-20 p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Recommended: 60-70 messages/hour</p>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={handleSettingsSave} loading={isSavingSettings}>Save Settings</Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* SECURITY */}
+          <Card>
+            <div className="pt-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Security</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Change your login password.</p>
+              <div className="mt-4 space-y-3">
+                <input type="password" placeholder="Current Password" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} />
+                <input type="password" placeholder="New Password" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                <div className="flex justify-end">
+                  <Button onClick={handleChangePassword} loading={isChangingPassword}>Update Password</Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* LICENSE */}
+          <Card>
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold dark:text-white">License & About</h3>
+              <div className="p-4 border rounded-lg bg-gray-50 dark:bg-slate-700 dark:border-slate-600">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className={`h-3 w-3 rounded-full ${licenseStatus?.activated ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                    <span className="text-sm font-medium dark:text-white">
+                      License: <b>{licenseStatus?.activated ? 'Active' : 'Not Active'}</b>
+                    </span>
+                  </div>
+                </div>
+                {licenseStatus?.activated && (
+                  <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">License Key</span>
+                      <p className="font-semibold dark:text-white">{licenseStatus.licenseKey}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Email</span>
+                      <p className="font-semibold dark:text-white">{licenseStatus.customerEmail}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Activated On</span>
+                      <p className="font-semibold dark:text-white">
+                        {licenseStatus.activationDate ? new Date(licenseStatus.activationDate).toLocaleDateString() : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="text-sm">
+                <div className="p-3 bg-gray-50 dark:bg-slate-700 rounded">
+                  <span className="text-gray-500 dark:text-gray-400">Application Version</span>
+                  <p className="font-semibold dark:text-white">{getVersion()}</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

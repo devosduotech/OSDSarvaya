@@ -18,7 +18,8 @@ const Dashboard: React.FC = () => {
     stopCampaignRun,
     cancelAllScheduledCampaigns,
     getFailedMessages,
-    showToast
+    showToast,
+    notificationLogs
   } = useAppContext();
 
   const [selectedCampaignRunId, setSelectedCampaignRunId] = useState<string>('');
@@ -189,9 +190,59 @@ const formatTime = (timestamp: string | number | undefined) => {
           <Card className="p-6 rounded-2xl shadow-sm border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700">
             <h3 className="text-sm text-slate-500 dark:text-slate-400">Groups</h3>
             <p className="mt-3 text-3xl font-bold text-slate-800 dark:text-white">{totalGroups}</p>
-          </Card>
+        </Card>
 
-        </div>
+        {/* ===== NOTIFICATION LOG ===== */}
+        {notificationLogs && notificationLogs.length > 0 && (
+          <Card className="p-6 rounded-2xl shadow-sm border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
+              Recent API Notifications
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b dark:border-slate-700">
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">Time</th>
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">Recipient</th>
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">API Key</th>
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">Status</th>
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">External ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notificationLogs.slice(0, 10).map((log) => (
+                    <tr key={log.id} className="border-b dark:border-slate-700/50">
+                      <td className="py-2 px-3 text-slate-600 dark:text-slate-300">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </td>
+                      <td className="py-2 px-3 text-slate-600 dark:text-slate-300">
+                        {log.recipientName || log.recipientPhone}
+                      </td>
+                      <td className="py-2 px-3 text-slate-600 dark:text-slate-300">
+                        {log.apiKeyName || '-'}
+                      </td>
+                      <td className="py-2 px-3">
+                        <span className={`px-2 py-0.5 rounded text-xs ${
+                          log.status === 'sent' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                          log.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                          log.status === 'skipped' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                          'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                        }`}>
+                          {log.status}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-slate-500 dark:text-slate-400 text-xs font-mono">
+                        {log.externalId || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+      </div>
 
         {/* ===== OVERALL ANALYTICS ===== */}
         <Card className="p-6 rounded-2xl shadow-sm border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700">

@@ -59,3 +59,37 @@ export interface FailedMessage {
   reason: string;
   createdAt: string;
 }
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  key_prefix: string;
+  rate_limit: number;
+  is_active: number;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  secret: string;
+  events: string[];
+  is_active: number;
+  created_at: string;
+}
+
+export interface NotificationLog {
+  id: string;
+  apiKeyId: string | null;
+  apiKeyName: string | null;
+  recipientPhone: string;
+  recipientName: string | null;
+  message: string | null;
+  status: string;
+  externalId: string | null;
+  error: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+}
