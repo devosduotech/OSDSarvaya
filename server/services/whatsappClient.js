@@ -2,6 +2,7 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../logger');
+const { applyTemplateVariables } = require('../utils/template');
 
 let waClient = null;
 let waStatus = 'DISCONNECTED';
@@ -121,9 +122,7 @@ async function initializeWhatsAppClient() {
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
                     '--disable-gpu',
-                    '--disable-site-isolation-trials',
-                    '--disable-features=IsolateOrigins,site-per-process',
-                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor',
                     '--disable-background-networking',
                     '--disable-default-apps',
                     '--disable-extensions',
@@ -133,7 +132,6 @@ async function initializeWhatsAppClient() {
                     '--mute-audio',
                     '--no-first-run',
                     '--safebrowsing-disable-auto-update',
-                    '--disable-features=VizDisplayCompositor',
                     '--disable-gpu-process-crash-dump',
                     '--disable-software-rasterizer',
                     '--no-default-browser-check',
@@ -205,7 +203,12 @@ async function initializeWhatsAppClient() {
                 setTimeout(async () => {
                     if (waStatus === 'DISCONNECTED') {
                         logger.info('Attempting auto-reconnect...');
-                        await initializeWhatsApp();
+                        try {
+                            waClient = null;
+                            await initializeWhatsAppClient();
+                        } catch (err) {
+                            logger.error({ err }, 'Auto-reconnect failed');
+                        }
                     }
                 }, 3000);
             });
@@ -291,16 +294,6 @@ async function destroyWhatsAppClient() {
 
 function normalizePhone(phone) {
     return phone.replace(/\D/g, '');
-}
-
-function applyTemplateVariables(message, contact) {
-    if (!message) return '';
-    Object.keys(contact).forEach(key => {
-        const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'gi');
-        message = message.replace(regex, contact[key] ?? '');
-    });
-    message = message.replace(/{{.*?}}/g, '');
-    return message;
 }
 
 module.exports = {

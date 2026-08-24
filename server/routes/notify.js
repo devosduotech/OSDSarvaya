@@ -5,6 +5,18 @@ const logger = require('../logger');
 const notifyEngine = require('../services/notifyEngine');
 const whatsappClient = require('../services/whatsappClient');
 const campaignEngine = require('../services/campaignEngine');
+const { createRateLimiter } = require('../utils/rateLimiter');
+
+// Abuse guard for the external messaging API: per API key, 60 requests/min.
+// Message pacing (msgs/hour) is enforced separately in the send engines.
+const notifyLimiter = createRateLimiter({
+    windowMs: 60 * 1000,
+    max: 60,
+    keyFn: (req) => req.apiKey?.id || req.headers['x-api-key'] || 'global',
+    name: 'notify'
+});
+
+router.use(notifyLimiter);
 
 router.post('/send', async (req, res) => {
     const { to, message, variables, attachment, externalId, scheduleAt } = req.body;

@@ -12,6 +12,13 @@ function getCampaignState() {
 
 function setCampaignRunning(val) {
     isCampaignRunning = val;
+    if (io) {
+        io.emit('campaign_status_change', {
+            isRunning: val,
+            runId: currentRunId,
+            status: val ? 'Sending' : undefined
+        });
+    }
 }
 
 function setCurrentRunId(id) {
@@ -23,6 +30,9 @@ async function processRun(runId, templateId, groupIds) {
     const db = await dbPromise;
     let sent = 0;
     let failed = 0;
+    // Contacts whose send threw an error (retryable); "not registered"
+    // numbers are excluded since they can never succeed
+    const failedContacts = [];
     currentRunId = runId;
     shouldStopCampaign = false;
 
@@ -70,8 +80,10 @@ async function processRun(runId, templateId, groupIds) {
 
         logger.info(`Querying contacts for groups: ${JSON.stringify(groupIdsArray)}`);
 
+        // DISTINCT prevents duplicate sends when a contact belongs to
+        // more than one of the selected groups
         const contacts = await db.all(
-            `SELECT c.*
+            `SELECT DISTINCT c.*
              FROM contacts c
              JOIN group_contacts gc
                ON c.id = gc.contact_id
@@ -99,6 +111,10 @@ async function processRun(runId, templateId, groupIds) {
             shouldStopCampaign = false;
 
             whatsappClient.emitActivity('campaign_completed', 'Campaign completed - no opted-in contacts found in selected groups', { runId });
+
+            if (io) {
+                io.emit('campaign_status_change', { isRunning: false, runId, status: 'Sent' });
+            }
             return;
         }
 
@@ -107,7 +123,8 @@ async function processRun(runId, templateId, groupIds) {
             acc[key] = isNaN(Number(value)) ? value : Number(value);
             return acc;
         }, {});
-        const messagesPerHour = settingsObj.messagesPerHour || 30;
+        // Clamp to a safe range: 0/negatives would disable throttling entirely
+        const messagesPerHour = Math.min(10000, Math.max(1, parseInt(settingsObj.messagesPerHour, 10) || 30));
         const baseDelay = Math.round(3600000 / messagesPerHour);
         const minMessageDelay = Math.max(baseDelay, 5000);
 
@@ -122,6 +139,8 @@ async function processRun(runId, templateId, groupIds) {
             `UPDATE reports SET totalContacts=? WHERE campaignRunId=?`,
             [contacts.length, runId]
         );
+
+        let stoppedDuringRun = false;
 
         for (const contact of contacts) {
             if (!waClient) {
@@ -199,6 +218,7 @@ async function processRun(runId, templateId, groupIds) {
                     [runId, contact.phone, contact.name || null, reason, new Date().toISOString()]
                 );
                 failed++;
+                failedContacts.push(contact);
 
                 const dispatchWebhook = require('../utils/webhookDispatcher');
                 dispatchWebhook('message.failed', {
@@ -223,6 +243,118 @@ async function processRun(runId, templateId, groupIds) {
 
             if (shouldStopCampaign) {
                 logger.info(`Campaign stopped by user at ${sent + failed}/${contacts.length}`);
+                stoppedDuringRun = true;
+                break;
+            }
+
+            if (sent + failed < contacts.length) {
+                await new Promise(r => setTimeout(r, getRandomDelay(minMessageDelay)));
+            }
+        }
+
+        if (stoppedDuringRun) {
+            await db.run(
+                `UPDATE campaign_runs SET status='Stopped' WHERE id=?`,
+                [runId]
+            );
+
+            whatsappClient.emitActivity('campaign_stopped', 'Campaign stopped by user', { runId, sent, failed });
+
+            isCampaignRunning = false;
+            currentRunId = null;
+            shouldStopCampaign = false;
+
+            if (io) {
+                io.emit('campaign_status_change', { isRunning: false, runId, status: 'Stopped' });
+            }
+        } else if (failedContacts.length === 0) {
+            await db.run(
+                `UPDATE campaign_runs SET status='Sent' WHERE id=?`,
+                [runId]
+            );
+
+            whatsappClient.emitActivity('campaign_completed', `Campaign completed (${sent} sent, ${failed} failed)`, { runId });
+
+            if (io) {
+                io.emit('campaign_status_change', { isRunning: false, runId, status: 'Sent' });
+            }
+
+            const dispatchWebhook = require('../utils/webhookDispatcher');
+            dispatchWebhook('campaign.completed', {
+                campaignRunId: runId,
+                sent,
+                failed,
+                total: contacts.length,
+                status: 'completed'
+            });
+        } else {
+            // Retry ONLY the contacts that failed (never re-send to the whole
+            // audience), keeping reports accurate as failures are recovered.
+            let stoppedDuringRetry = false;
+            const maxRetries = settingsObj.maxRetries || 3;
+            const currentRetryCount = (await db.get(`SELECT retryCount FROM campaign_runs WHERE id=?`, [runId]))?.retryCount || 0;
+
+            if (currentRetryCount < maxRetries) {
+                logger.info(`Retrying ${failedContacts.length} failed messages, attempt ${currentRetryCount + 1}/${maxRetries}`);
+
+                await db.run(`UPDATE campaign_runs SET retryCount = ? WHERE id=?`, [currentRetryCount + 1, runId]);
+
+                for (const contact of failedContacts) {
+                    if (shouldStopCampaign) {
+                        stoppedDuringRetry = true;
+                        break;
+                    }
+
+                    try {
+                        if (!waClient || !waClient.info) throw new Error('WhatsApp client disconnected');
+
+                        const formatted = whatsappClient.normalizePhone(contact.phone);
+                        const numberId = await waClient.getNumberId(formatted);
+                        if (!numberId) continue;
+
+                        const message = whatsappClient.applyTemplateVariables(template.message, contact);
+
+                        if (template.attachment && template.attachment.data) {
+                            const { mimeType, data, filename } = template.attachment;
+                            const isVideo = mimeType.startsWith('video/');
+                            if (isVideo) {
+                                const media = new whatsappClient.MessageMedia('application/octet-stream', data, filename);
+                                await waClient.sendMessage(numberId._serialized, media);
+                            } else {
+                                const media = new whatsappClient.MessageMedia(mimeType, data, filename);
+                                await waClient.sendMessage(numberId._serialized, media, { caption: message });
+                            }
+                        } else {
+                            await waClient.sendMessage(numberId._serialized, message);
+                        }
+
+                        sent++;
+                        failed--;
+
+                        // Recovered: remove from the failed list for this run
+                        await db.run(
+                            `DELETE FROM failed_messages WHERE campaignRunId = ? AND contactPhone = ?`,
+                            [runId, contact.phone]
+                        );
+                    } catch (err) {
+                        logger.error({ err, contact: contact.phone }, 'RETRY SEND FAILED');
+                    }
+
+                    await new Promise(r => setTimeout(r, getRandomDelay(minMessageDelay)));
+                }
+
+                await db.run(
+                    `UPDATE reports SET sent=?, failed=?, progress=((sent + failed) / ?) * 100 WHERE campaignRunId=?`,
+                    [sent, failed, contacts.length, runId]
+                );
+
+                if (io) {
+                    io.emit('campaign_progress', { runId, sent, failed, progress: ((sent + failed) / contacts.length) * 100 });
+                }
+            }
+
+            if (stoppedDuringRetry) {
+                logger.info(`Campaign stopped by user during retry at ${sent}/${contacts.length}`);
 
                 await db.run(
                     `UPDATE campaign_runs SET status='Stopped' WHERE id=?`,
@@ -234,74 +366,32 @@ async function processRun(runId, templateId, groupIds) {
                 isCampaignRunning = false;
                 currentRunId = null;
                 shouldStopCampaign = false;
-                return;
-            }
 
-            if (sent + failed < contacts.length) {
-                await new Promise(r => setTimeout(r, getRandomDelay(minMessageDelay)));
-            }
-        }
+                if (io) {
+                    io.emit('campaign_status_change', { isRunning: false, runId, status: 'Stopped' });
+                }
+            } else {
+                await db.run(
+                    `UPDATE campaign_runs SET status='Sent' WHERE id=?`,
+                    [runId]
+                );
 
-        await db.run(
-            `UPDATE campaign_runs SET status='Sent' WHERE id=?`,
-            [runId]
-        );
+                whatsappClient.emitActivity('campaign_completed', `Campaign completed (${sent} sent, ${failed} failed)`, { runId });
 
-        const maxRetries = settingsObj.maxRetries || 3;
-        const currentRetryCount = (await db.get(`SELECT retryCount FROM campaign_runs WHERE id=?`, [runId]))?.retryCount || 0;
-
-        if (failed > 0 && currentRetryCount < maxRetries) {
-            logger.info(`Retrying failed messages: ${failed} contacts, attempt ${currentRetryCount + 1}/${maxRetries}`);
-
-            await db.run(`UPDATE campaign_runs SET retryCount = ? WHERE id=?`, [currentRetryCount + 1, runId]);
-
-            for (const contact of contacts) {
-                if (shouldStopCampaign) break;
-
-                try {
-                    const formatted = whatsappClient.normalizePhone(contact.phone);
-                    const numberId = await waClient.getNumberId(`${formatted}@c.us`);
-                    if (!numberId) continue;
-
-                    let message = whatsappClient.applyTemplateVariables(template.message, contact);
-
-                    if (template.attachment && template.attachment.data) {
-                        const { mimeType, data, filename } = template.attachment;
-                        const isVideo = mimeType.startsWith('video/');
-                        if (isVideo) {
-                            const media = new whatsappClient.MessageMedia('application/octet-stream', data, filename);
-                            await waClient.sendMessage(numberId._serialized, media);
-                        } else {
-                            const media = new whatsappClient.MessageMedia(mimeType, data, filename);
-                            await waClient.sendMessage(numberId._serialized, media, { caption: message });
-                        }
-                    } else {
-                        await waClient.sendMessage(numberId._serialized, message);
-                    }
-                    sent++;
-                } catch (err) {
-                    logger.error({ err }, 'RETRY SEND FAILED');
+                if (io) {
+                    io.emit('campaign_status_change', { isRunning: false, runId, status: 'Sent' });
                 }
 
-                await new Promise(r => setTimeout(r, getRandomDelay(minMessageDelay)));
+                const dispatchWebhook = require('../utils/webhookDispatcher');
+                dispatchWebhook('campaign.completed', {
+                    campaignRunId: runId,
+                    sent,
+                    failed,
+                    total: contacts.length,
+                    status: 'completed'
+                });
             }
-
-            await db.run(
-                `UPDATE reports SET sent=?, failed=? WHERE campaignRunId=?`,
-                [sent, failed, runId]
-            );
         }
-
-        whatsappClient.emitActivity('campaign_completed', `Campaign completed (${sent} sent, ${failed} failed)`, { runId });
-
-        const dispatchWebhook = require('../utils/webhookDispatcher');
-        dispatchWebhook('campaign.completed', {
-            campaignRunId: runId,
-            sent,
-            failed,
-            total: contacts.length,
-            status: 'completed'
-        });
 
     } catch (err) {
         logger.error({ err, runId, templateId, groupIds }, 'PROCESS RUN FAILED');
@@ -312,6 +402,10 @@ async function processRun(runId, templateId, groupIds) {
         );
 
         whatsappClient.emitActivity('campaign_failed', `Campaign failed: ${err.message}`, { runId });
+
+        if (io) {
+            io.emit('campaign_status_change', { isRunning: false, runId, status: 'Failed' });
+        }
 
         const dispatchWebhook = require('../utils/webhookDispatcher');
         dispatchWebhook('campaign.completed', {
@@ -334,7 +428,8 @@ async function processRun(runId, templateId, groupIds) {
             logger.info(`Auto-starting queued campaign: ${nextQueued.id}`);
             await db.run(`UPDATE campaign_runs SET status = 'Sending' WHERE id = ?`, [nextQueued.id]);
             const nextGroupIds = JSON.parse(nextQueued.targetGroupIds);
-            isCampaignRunning = true;
+            currentRunId = nextQueued.id;
+            setCampaignRunning(true);
             processRun(nextQueued.id, nextQueued.campaignTemplateId, nextGroupIds)
                 .catch(err => logger.error({ err }, 'Queued campaign crashed'));
         }
@@ -350,7 +445,7 @@ function setIO(socketIO) {
 }
 
 function startScheduler() {
-    setInterval(async () => {
+    const timer = setInterval(async () => {
         logger.info(`Scheduler check: isCampaignRunning=${isCampaignRunning}, waStatus=${whatsappClient.getStatus()}`);
 
         if (isCampaignRunning || whatsappClient.getStatus() !== 'CONNECTED') {
@@ -376,7 +471,8 @@ function startScheduler() {
                 logger.info(`Starting scheduled campaign: ${run.id}`);
                 await db.run(`UPDATE campaign_runs SET status = 'Sending' WHERE id = ?`, [run.id]);
                 const groupIds = JSON.parse(run.targetGroupIds);
-                isCampaignRunning = true;
+                currentRunId = run.id;
+                setCampaignRunning(true);
                 processRun(run.id, run.campaignTemplateId, groupIds)
                     .catch(err => logger.error({ err }, 'processRun crashed'));
             }
@@ -384,6 +480,9 @@ function startScheduler() {
             logger.error({ err }, 'Scheduler error');
         }
     }, 30000);
+
+    // Don't keep the process alive just for the scheduler timer
+    if (timer.unref) timer.unref();
 }
 
 module.exports = {

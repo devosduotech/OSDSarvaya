@@ -4,6 +4,7 @@ const router = express.Router();
 const dbPromise = require('../database');
 const logger = require('../logger');
 const { testWebhook: testWebhookDelivery } = require('../utils/webhookDispatcher');
+const { isSafeWebhookUrl } = require('../utils/security');
 
 const AVAILABLE_EVENTS = [
     'message.sent',
@@ -13,13 +14,25 @@ const AVAILABLE_EVENTS = [
     'campaign.stopped'
 ];
 
+// Never expose signing secrets in list/read payloads; they are shown once
+// at creation time only.
+function stripSecret(webhook) {
+    if (!webhook) return webhook;
+    const { secret, ...rest } = webhook;
+    return { ...rest, hasSecret: true };
+}
+
+function validateEvents(events) {
+    return events.filter(e => AVAILABLE_EVENTS.includes(e));
+}
+
 router.get('/', async (req, res) => {
     try {
         const db = await dbPromise;
         const webhooks = await db.all('SELECT * FROM webhooks ORDER BY created_at DESC');
 
         const processed = webhooks.map(w => ({
-            ...w,
+            ...stripSecret(w),
             events: JSON.parse(w.events || '[]')
         }));
 
@@ -45,15 +58,29 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ success: false, message: 'At least one event is required' });
     }
 
+    // SSRF guard: reject non-http(s) schemes and local/private targets
+    const urlCheck = isSafeWebhookUrl(url.trim());
+    if (!urlCheck.ok) {
+        return res.status(400).json({ success: false, message: `Webhook URL rejected: ${urlCheck.reason}` });
+    }
+
+    const validEvents = validateEvents(events);
+    if (validEvents.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: `No valid events. Available events: ${AVAILABLE_EVENTS.join(', ')}`
+        });
+    }
+
     try {
         const db = await dbPromise;
         const id = `webhook_${Date.now()}`;
         const secret = crypto.randomBytes(32).toString('hex');
-        const eventsJson = JSON.stringify(events);
+        const eventsJson = JSON.stringify(validEvents);
 
         await db.run(
             'INSERT INTO webhooks (id, name, url, secret, events, is_active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
-            [id, name.trim(), url.trim(), secret, eventsJson, new Date().toISOString()]
+            [id, name.trim(), urlCheck.url.href, secret, eventsJson, new Date().toISOString()]
         );
 
         logger.info({ webhookId: id, webhookName: name }, 'Webhook created');
@@ -63,9 +90,9 @@ router.post('/', async (req, res) => {
             webhook: {
                 id,
                 name: name.trim(),
-                url: url.trim(),
+                url: urlCheck.url.href,
                 secret,
-                events,
+                events: validEvents,
                 isActive: true,
                 createdAt: new Date().toISOString()
             }
@@ -96,12 +123,23 @@ router.put('/:id', async (req, res) => {
             values.push(name.trim());
         }
         if (url !== undefined) {
+            const urlCheck = isSafeWebhookUrl(url.trim());
+            if (!urlCheck.ok) {
+                return res.status(400).json({ success: false, message: `Webhook URL rejected: ${urlCheck.reason}` });
+            }
             updates.push('url = ?');
-            values.push(url.trim());
+            values.push(urlCheck.url.href);
         }
         if (events !== undefined && Array.isArray(events)) {
+            const validEvents = validateEvents(events);
+            if (validEvents.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `No valid events. Available events: ${AVAILABLE_EVENTS.join(', ')}`
+                });
+            }
             updates.push('events = ?');
-            values.push(JSON.stringify(events));
+            values.push(JSON.stringify(validEvents));
         }
         if (isActive !== undefined) {
             updates.push('is_active = ?');
@@ -120,7 +158,7 @@ router.put('/:id', async (req, res) => {
 
         logger.info({ webhookId: id }, 'Webhook updated');
 
-        res.json({ success: true, webhook: updated });
+        res.json({ success: true, webhook: stripSecret(updated) });
     } catch (err) {
         logger.error({ err }, 'Failed to update webhook');
         res.status(500).json({ success: false, message: 'Failed to update webhook' });

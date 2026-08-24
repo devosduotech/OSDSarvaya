@@ -89,7 +89,7 @@ COPY server/ ./server/
 RUN mkdir -p /app/server/.wwebjs_auth
 RUN mkdir -p /app/server/data
 
-EXPOSE 3201
+EXPOSE 3001
 
 WORKDIR /app/server
 CMD ["node", "server.js"]

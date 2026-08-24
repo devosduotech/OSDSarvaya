@@ -64,7 +64,11 @@ async function sendNotification({ to, message, variables, attachment, externalId
         acc[key] = isNaN(Number(value)) ? value : Number(value);
         return acc;
     }, {});
-    const messagesPerHour = (apiKey && apiKey.rateLimit > 0) ? apiKey.rateLimit : (settingsObj.messagesPerHour || 30);
+    // Clamp to a safe range: 0/negatives would disable throttling entirely.
+    // A key-level rate_limit overrides the global setting when set.
+    const safeGlobalRate = Math.min(10000, Math.max(1, parseInt(settingsObj.messagesPerHour, 10) || 30));
+    const safeKeyRate = Math.min(10000, Math.max(1, parseInt(apiKey?.rateLimit, 10) || 0));
+    const messagesPerHour = safeKeyRate > 0 ? safeKeyRate : safeGlobalRate;
     const baseDelay = Math.round(3600000 / messagesPerHour);
     const minMessageDelay = Math.max(baseDelay, 5000);
 

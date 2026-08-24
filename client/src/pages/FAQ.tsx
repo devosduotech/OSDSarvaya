@@ -193,6 +193,76 @@ const FAQ: React.FC = () => {
     {
       question: 'How do I stop a running campaign?',
       answer: `Go to the Dashboard and click the "Stop Campaign" button. The campaign will stop sending new messages, but already sent messages will not be retracted.`
+    },
+    {
+      question: 'What are API Keys and how do I use them?',
+      answer: `API Keys let external applications (ERPs, CRMs, scripts) authenticate with OSDSarvaya to send messages programmatically. Create one in <strong>Settings → API Keys</strong>, then include it in the <code>x-api-key</code> HTTP header when calling the Notification API. Each key starts with the prefix <code>osds_</code>. You can disable or revoke keys at any time.`
+    },
+    {
+      question: 'Can I see my API key after creating it?',
+      answer: `No. The full API key is shown only once at creation time for security. Make sure to copy it immediately. If you lose it, revoke the old key and create a new one.`
+    },
+    {
+      question: 'What is the Notification API?',
+      answer: `The Notification API allows external systems to send WhatsApp messages through OSDSarvaya using API keys. It includes:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li><strong>POST /api/notify/send</strong> — Send a message to one or more numbers</li>
+          <li><strong>POST /api/notify/template</strong> — Send using a pre-defined template</li>
+          <li><strong>POST /api/notify/bulk</strong> — Send to all contacts in a group</li>
+          <li><strong>GET /api/notify/status/:externalId</strong> — Check delivery status</li>
+          <li><strong>GET /api/notify/logs</strong> — View notification history</li>
+        </ul>
+        <p class="mt-2">See the <strong>Help</strong> page for detailed API documentation with examples.</p>`
+    },
+    {
+      question: 'How do I use message variables in API requests?',
+      answer: `Use double curly braces in your message text and provide values in the <code>variables</code> object:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li><code>{{name}}</code> — Contact's name</li>
+          <li><code>{{phone}}</code> — Contact's phone number</li>
+          <li><code>{{email}}</code> — Contact's email</li>
+          <li>Custom: <code>{{order_id}}</code>, <code>{{amount}}</code>, etc.</li>
+        </ul>
+        <p class="mt-2">Example: Message = "Hello <code>{{name}}</code>, order <code>{{order_id}}</code> is ready!" with variables: <code>{"name": "John", "order_id": "SO-123"}</code></p>`
+    },
+    {
+      question: 'What are webhooks and why should I use them?',
+      answer: `Webhooks let OSDSarvaya push real-time event data to your external systems (ERP, CRM, etc.) when things happen — like a message being sent, a campaign completing, or a message failing. This is useful for keeping your ERP in sync with WhatsApp delivery status without polling.`
+    },
+    {
+      question: 'What events can I subscribe to with webhooks?',
+      answer: `You can subscribe to these events:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li><code>message.sent</code> — A message was successfully sent</li>
+          <li><code>message.failed</code> — A message failed to send</li>
+          <li><code>campaign.started</code> — A campaign started sending</li>
+          <li><code>campaign.completed</code> — A campaign finished all messages</li>
+          <li><code>campaign.stopped</code> — A campaign was manually stopped</li>
+        </ul>`
+    },
+    {
+      question: 'How do I verify that a webhook is from OSDSarvaya?',
+      answer: `Each webhook delivery includes an <code>X-OSDSarvaya-Signature</code> header containing an HMAC-SHA256 hash. Compute HMAC-SHA256 of the raw request body using your webhook secret, and compare it with the signature header. If they match, the webhook is authentic.`
+    },
+    {
+      question: 'What happens if my webhook endpoint is down?',
+      answer: `OSDSarvaya retries failed webhook deliveries up to <strong>3 times</strong> with increasing delays: 1 second, 5 seconds, and 25 seconds. If all retries fail, the delivery is logged as failed. You can test your webhook endpoint using the <strong>Test</strong> button in Settings → Webhooks.`
+    },
+    {
+      question: 'Can I use the API when a campaign is already running?',
+      answer: `Yes, with some differences:
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li><strong>/api/notify/send</strong> and <strong>/api/notify/template</strong> return HTTP 202 (try again later) while a campaign is running</li>
+          <li><strong>/api/notify/bulk</strong> automatically queues your request and sends it after the current campaign finishes</li>
+        </ul>`
+    },
+    {
+      question: 'How do I track which ERP order a notification belongs to?',
+      answer: `Use the <code>externalId</code> parameter when sending notifications. This can be any string (e.g., your Sales Order number). You can later look up the status using <code>GET /api/notify/status/:externalId</code>. Webhook payloads also include the <code>externalId</code> so your ERP can match events back to the original record.`
+    },
+    {
+      question: 'Is the Notification API different from the Dashboard login?',
+      answer: `Yes. The Dashboard uses <strong>JWT authentication</strong> (username + password login). The Notification API uses <strong>API Key authentication</strong> via the <code>x-api-key</code> header. API keys are meant for server-to-server communication and don't require a browser login session.`
     }
   ];
 

@@ -6,6 +6,19 @@ const path = require('path');
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'machine_id.json');
 
 function getWindowsMachineId() {
+    // wmic is deprecated/removed on recent Windows 11 builds; try CIM first
+    try {
+        const output = execSync(
+            'powershell -NoProfile -Command "(Get-CimInstance Win32_ComputerSystemProduct).UUID"',
+            { encoding: 'utf8', timeout: 5000 }
+        );
+        const uuid = output.trim();
+        if (uuid && uuid.length > 10 && !/^null$/i.test(uuid)) {
+            return uuid.toUpperCase();
+        }
+    } catch (e) {
+        console.error('Failed to get Windows UUID via CIM:', e.message);
+    }
     try {
         const output = execSync('wmic csproduct get uuid', { encoding: 'utf8', timeout: 5000 });
         const lines = output.trim().split('\n');
@@ -16,7 +29,7 @@ function getWindowsMachineId() {
             }
         }
     } catch (e) {
-        console.error('Failed to get Windows UUID:', e.message);
+        console.error('Failed to get Windows UUID via wmic:', e.message);
     }
     return null;
 }
@@ -114,7 +127,7 @@ function getMachineId() {
     const machineId = generateMachineId();
 
     try {
-        fs.writeFileSync(CACHE_FILE, JSON.stringify({ machineId, generatedAt: new Date().toISOString() }));
+        fs.writeFileSync(CACHE_FILE, JSON.stringify({ machineId, generatedAt: new Date().toISOString() }), { mode: 0o600 });
     } catch (e) {
         console.error('Failed to cache machine ID:', e.message);
     }

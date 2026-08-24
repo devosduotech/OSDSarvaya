@@ -20,9 +20,12 @@ function getDbPath() {
 
 let db = null;
 let SQL = null;
+// While a transaction is open, per-write disk saves are suppressed so that
+// rolled-back data never reaches the disk file.
+let inTransaction = false;
 
 function saveDatabase() {
-    if (db) {
+    if (db && !inTransaction) {
         try {
             const data = db.export();
             const buffer = Buffer.from(data);
@@ -91,6 +94,33 @@ const dbWrapper = {
             saveDatabase();
         } catch (e) {
             logger.error({ e, sql }, 'DB exec error');
+            throw e;
+        }
+    },
+    // Runs fn inside a SQL transaction. On success the transaction is
+    // committed and the database is persisted once; on any thrown error
+    // (including inside async callbacks) everything is rolled back.
+    transaction: async (fn) => {
+        if (typeof fn !== 'function') {
+            throw new Error('transaction() requires a callback function');
+        }
+
+        db.run('BEGIN');
+        inTransaction = true;
+
+        try {
+            const result = await fn(dbWrapper);
+            db.run('COMMIT');
+            inTransaction = false;
+            saveDatabase();
+            return result;
+        } catch (e) {
+            try {
+                db.run('ROLLBACK');
+            } catch (rollbackErr) {
+                logger.error({ e: rollbackErr }, 'DB rollback failed');
+            }
+            inTransaction = false;
             throw e;
         }
     }
@@ -326,10 +356,17 @@ const initializeDb = async () => {
         db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('messagesPerHour', '30')");
         db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('maxRetries', '3')");
 
+        // Indexes for hot lookups as logs grow
+        db.run('CREATE INDEX IF NOT EXISTS idx_notification_log_external_id ON notification_log(external_id)');
+        db.run('CREATE INDEX IF NOT EXISTS idx_notification_log_created_at ON notification_log(created_at)');
+        db.run('CREATE INDEX IF NOT EXISTS idx_notification_log_api_key_id ON notification_log(api_key_id)');
+
         saveDatabase();
         logger.info('Database schema verified and is up-to-date.');
 
-        setInterval(saveDatabase, 30000);
+        const autosave = setInterval(saveDatabase, 30000);
+        // Don't keep the process alive just for the autosave timer
+        if (autosave.unref) autosave.unref();
 
         return dbWrapper;
     } catch (err) {

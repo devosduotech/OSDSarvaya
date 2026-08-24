@@ -199,6 +199,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
         apiKeys?: ApiKey[];
         webhooks?: Webhook[];
         notificationLogs?: NotificationLog[];
+        isCampaignRunning?: boolean;
       }>('/data', 'GET');
 
       setContacts(data.contacts);
@@ -219,6 +220,9 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       }
       if (data.notificationLogs) {
         setNotificationLogs(data.notificationLogs);
+      }
+      if (typeof data.isCampaignRunning === 'boolean') {
+        setCampaignRunning(data.isCampaignRunning);
       }
 
       // Fetch version from server (for display only, actual version from package.json)
@@ -613,7 +617,6 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   const connectWhatsApp = async () => {
     console.log('CONNECT WA CLICKED via REST API');
     const token = localStorage.getItem('osdsarvaya_token');
-    console.log('Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'NULL');
     if (!token) {
       console.error('No token found!');
       return;

@@ -3,8 +3,29 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const logger = require('../logger');
 const dbPromise = require('../database');
+const { createRateLimiter, getClientIp } = require('../utils/rateLimiter');
 
 const router = express.Router();
+
+// Brute-force protection on public auth endpoints
+const loginLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    keyFn: getClientIp,
+    name: 'auth:login'
+});
+const setupLimiter = createRateLimiter({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    keyFn: getClientIp,
+    name: 'auth:setup'
+});
+const passwordChangeLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    keyFn: getClientIp,
+    name: 'auth:change-password'
+});
 
 // Check if admin exists (for setup wizard)
 router.get('/check', async (req, res) => {
@@ -20,7 +41,7 @@ router.get('/check', async (req, res) => {
 });
 
 // Setup admin user (first-time)
-router.post('/setup', async (req, res) => {
+router.post('/setup', setupLimiter, async (req, res) => {
     try {
         const { username, password } = req.body;
 
@@ -84,7 +105,7 @@ router.post('/setup', async (req, res) => {
 });
 
 // Login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
     try {
         const { username, password } = req.body;
 
@@ -136,7 +157,7 @@ router.post('/login', async (req, res) => {
 });
 
 // Change password
-router.post('/change-password', async (req, res) => {
+router.post('/change-password', passwordChangeLimiter, async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
         const token = req.headers.authorization?.replace('Bearer ', '');
@@ -152,16 +173,12 @@ router.post('/change-password', async (req, res) => {
         // Password validation: min 8 chars, 1 uppercase, 1 numeric
         const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
         if (!passwordRegex.test(newPassword)) {
-            return res.status(400).json({ 
-                error: 'Password must be at least 8 characters with 1 uppercase letter and 1 numeric digit' 
+            return res.status(400).json({
+                error: 'Password must be at least 8 characters with 1 uppercase letter and 1 numeric digit'
             });
         }
 
-        const db = await dbPromise;
-
-        // Get JWT secret
-        const config = db.get("SELECT value FROM app_config WHERE key = 'jwt_secret'");
-        const jwtSecret = config ? config.value : null;
+        const jwtSecret = process.env.JWT_SECRET;
 
         if (!jwtSecret) {
             return res.status(500).json({ error: 'Server configuration error' });

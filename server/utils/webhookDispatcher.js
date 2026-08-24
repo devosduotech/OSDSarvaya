@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const logger = require('../logger');
 const dbPromise = require('../database');
+const { isSafeWebhookUrl } = require('./security');
 
 function signPayload(payload, secret) {
     const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
@@ -34,6 +35,14 @@ async function dispatchWebhook(event, data) {
         }
 
         if (!events.includes(event)) continue;
+
+        // Defensive re-check at delivery time (covers URLs saved before
+        // SSRF validation existed and DNS names that resolve locally)
+        const urlCheck = isSafeWebhookUrl(webhook.url);
+        if (!urlCheck.ok) {
+            logger.warn({ webhookId: webhook.id, reason: urlCheck.reason }, 'Blocked unsafe webhook URL');
+            continue;
+        }
 
         const signature = signPayload(payload, webhook.secret);
 
@@ -90,6 +99,15 @@ async function testWebhook(webhookId) {
 
     if (!webhook) {
         throw new Error('Webhook not found');
+    }
+
+    const urlCheck = isSafeWebhookUrl(webhook.url);
+    if (!urlCheck.ok) {
+        return {
+            success: false,
+            statusCode: 0,
+            message: `Webhook URL rejected: ${urlCheck.reason}`
+        };
     }
 
     const payload = {

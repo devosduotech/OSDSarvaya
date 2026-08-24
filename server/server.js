@@ -75,7 +75,12 @@ function getDataPath() {
 // SECURITY
 // =====================================================
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || "*",
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
+}));
+// 15mb limit accommodates base64 message attachments sent via the API
 app.use(express.json({ limit: '15mb' }));
 
 // =====================================================

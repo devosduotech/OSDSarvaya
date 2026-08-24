@@ -4,6 +4,7 @@ const router = express.Router();
 const dbPromise = require('../database');
 const logger = require('../logger');
 const { APP_VERSION } = require('../version');
+const campaignEngine = require('../services/campaignEngine');
 
 const API_VERSION = 'v1';
 
@@ -54,7 +55,7 @@ router.get('/data', async (req, res) => {
             apiKeys = await db.all("SELECT id, name, key_prefix, rate_limit, is_active, created_at, last_used_at FROM api_keys ORDER BY created_at DESC");
         } catch (e) { /* table may not exist yet */ }
         try {
-            const webhooksRaw = await db.all("SELECT * FROM webhooks ORDER BY created_at DESC");
+            const webhooksRaw = await db.all("SELECT id, name, url, events, is_active, created_at, api_key_id FROM webhooks ORDER BY created_at DESC");
             webhooks = webhooksRaw.map(w => ({...w, events: JSON.parse(w.events || '[]')}));
         } catch (e) { /* table may not exist yet */ }
         try {
@@ -75,6 +76,7 @@ router.get('/data', async (req, res) => {
             activities,
             apiKeys,
             webhooks,
+            isCampaignRunning: campaignEngine.getCampaignState().isCampaignRunning,
             notificationLogs: notificationLogs.map(l => ({
                 id: l.id,
                 apiKeyId: l.api_key_id,
@@ -426,10 +428,17 @@ router.delete('/templates/:id', async (req, res) => {
 // SETTINGS
 router.put('/settings', async (req, res) => {
     const { messagesPerHour } = req.body;
+
+    // Validate: 0/negatives would disable throttling entirely downstream
+    const parsed = parseInt(messagesPerHour, 10);
+    if (Number.isNaN(parsed) || parsed < 1 || parsed > 10000) {
+        return res.status(400).json({ message: 'messagesPerHour must be a number between 1 and 10000' });
+    }
+
     try {
         const db = await dbPromise;
-        await db.run("UPDATE settings SET value = ? WHERE key = 'messagesPerHour'", [messagesPerHour]);
-        res.json({ messagesPerHour });
+        await db.run("UPDATE settings SET value = ? WHERE key = 'messagesPerHour'", [String(parsed)]);
+        res.json({ messagesPerHour: parsed });
     } catch (err) { logger.error({ err }, "Failed to update settings"); res.status(500).json({ message: "Error updating settings" }); }
 });
 
@@ -449,18 +458,32 @@ router.get('/backup', async (req, res) => {
 router.post('/backup', async (req, res) => {
     const { contacts, groups, templates, runs, reports, settings, group_contacts } = req.body;
     const db = await dbPromise;
-    try {
-        // Clear all data
-        await Promise.all(['group_contacts', 'contacts', 'groups', 'reports', 'campaign_runs', 'campaign_templates', 'settings'].map(t => db.run(`DELETE FROM ${t}`)));
 
-        // Insert new data
-        for (const c of contacts) await db.run("INSERT INTO contacts (id, name, phone, email, tags) VALUES (?, ?, ?, ?, ?)", [c.id, c.name, c.phone, c.email, c.tags]);
-        for (const g of groups) await db.run("INSERT INTO groups (id, name) VALUES (?, ?)", [g.id, g.name]);
-        for (const t of templates) await db.run("INSERT INTO campaign_templates (id, name, message, attachment, createdAt) VALUES (?, ?, ?, ?, ?)", [t.id, t.name, t.message, t.attachment, t.createdAt]);
-        for (const r of runs) await db.run("INSERT INTO campaign_runs (id, campaignTemplateId, targetGroupIds, status, createdAt) VALUES (?, ?, ?, ?, ?)", [r.id, r.campaignTemplateId, r.targetGroupIds, r.status, r.createdAt]);
-        for (const r of reports) await db.run("INSERT INTO reports (campaignRunId, totalContacts, sent, delivered, read, failed, progress) VALUES (?, ?, ?, ?, ?, ?, ?)", [r.campaignRunId, r.totalContacts, r.sent, r.delivered, r.read, r.failed, r.progress]);
-        for (const s of settings) await db.run("INSERT INTO settings (key, value) VALUES (?, ?)", [s.key, s.value]);
-        for (const gc of group_contacts) await db.run("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)", [gc.group_id, gc.contact_id]);
+    // Basic shape validation before touching existing data
+    if (
+        !Array.isArray(contacts) || !Array.isArray(groups) || !Array.isArray(templates) ||
+        !Array.isArray(runs) || !Array.isArray(reports) || !Array.isArray(settings) ||
+        !Array.isArray(group_contacts)
+    ) {
+        return res.status(400).json({ message: 'Invalid backup payload: expected arrays for all collections.' });
+    }
+
+    try {
+        // Atomic restore: either the whole backup is applied or nothing
+        // changes. Previously a mid-restore failure left the database empty.
+        await db.transaction(async (tx) => {
+            // Clear all data
+            await Promise.all(['group_contacts', 'contacts', 'groups', 'reports', 'campaign_runs', 'campaign_templates', 'settings'].map(t => tx.run(`DELETE FROM ${t}`)));
+
+            // Insert new data
+            for (const c of contacts) await tx.run("INSERT INTO contacts (id, name, phone, email, tags) VALUES (?, ?, ?, ?, ?)", [c.id, c.name, c.phone, c.email, c.tags]);
+            for (const g of groups) await tx.run("INSERT INTO groups (id, name) VALUES (?, ?)", [g.id, g.name]);
+            for (const t of templates) await tx.run("INSERT INTO campaign_templates (id, name, message, attachment, createdAt) VALUES (?, ?, ?, ?, ?)", [t.id, t.name, t.message, t.attachment, t.createdAt]);
+            for (const r of runs) await tx.run("INSERT INTO campaign_runs (id, campaignTemplateId, targetGroupIds, status, createdAt) VALUES (?, ?, ?, ?, ?)", [r.id, r.campaignTemplateId, r.targetGroupIds, r.status, r.createdAt]);
+            for (const r of reports) await tx.run("INSERT INTO reports (campaignRunId, totalContacts, sent, delivered, read, failed, progress) VALUES (?, ?, ?, ?, ?, ?, ?)", [r.campaignRunId, r.totalContacts, r.sent, r.delivered, r.read, r.failed, r.progress]);
+            for (const s of settings) await tx.run("INSERT INTO settings (key, value) VALUES (?, ?)", [s.key, s.value]);
+            for (const gc of group_contacts) await tx.run("INSERT INTO group_contacts (group_id, contact_id) VALUES (?, ?)", [gc.group_id, gc.contact_id]);
+        });
 
         res.status(200).json({ message: 'Restore successful.' });
     } catch (err) {
