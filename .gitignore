@@ -27,6 +27,9 @@ dist-ssr
 osdsarvaya_data/
 osdsarvaya_session/
 production.env
+UPDATE.md
+*.db
+*.db.bak
 
 # Electron build
 client/release/
@@ -36,6 +39,10 @@ server/node_modules/
 
 # Windows builds (keep local only)
 windows/
+
+# Bundled Chrome (downloaded during build)
+client/chrome-win64/
+client/chrome-win64.zip
 
 # Environment
 .env

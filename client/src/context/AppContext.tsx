@@ -13,7 +13,11 @@ import {
   Group,
   CampaignTemplate,
   CampaignRun,
-  CampaignReport
+  CampaignReport,
+  FailedMessage,
+  ApiKey,
+  Webhook,
+  NotificationLog
 } from '../types';
 
 import io, { Socket } from 'socket.io-client';
@@ -46,6 +50,8 @@ interface AppContextType {
   deleteContact: (id: string) => Promise<boolean>;
   toggleContactOptStatus: (id: string, optedIn: boolean) => Promise<boolean>;
   addContactsBulk: (contacts: Omit<Contact, 'id'>[]) => Promise<boolean>;
+  updateContactsBulk: (contacts: { phone: string; name?: string; email?: string; tags?: string }[]) => Promise<{ updated: number; notFound: number; notFoundPhones?: string[] } | null>;
+  deleteContactsBulk: (ids: string[]) => Promise<boolean>;
 
   addGroup: (group: { name: string; contactIds: string[] }) => Promise<Group | null>;
   updateGroup: (group: Group) => Promise<Group | null>;
@@ -68,6 +74,8 @@ interface AppContextType {
   stopCampaignRun: () => Promise<boolean>;
   scheduleCampaign: (templateId: string, groupIds: string[], scheduledAt: string) => Promise<{ success: boolean; runId: string } | null>;
   cancelQueuedCampaign: (runId: string) => Promise<boolean>;
+  cancelAllScheduledCampaigns: () => Promise<number>;
+  getFailedMessages: (runId: string) => Promise<FailedMessage[]>;
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   toast: { message: string; type: 'success' | 'error' | 'warning' | 'info' } | null;
   setToast: React.Dispatch<React.SetStateAction<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>>;
@@ -79,6 +87,18 @@ interface AppContextType {
   disconnectWhatsApp: () => void;
   resetWhatsApp: () => void;
   isCampaignRunning: boolean;
+
+  apiKeys: ApiKey[];
+  webhooks: Webhook[];
+  notificationLogs: NotificationLog[];
+  availableWebhookEvents: string[];
+  createApiKey: (name: string) => Promise<{ success: boolean; apiKey?: any; message?: string }>;
+  toggleApiKey: (id: string, isActive: boolean) => Promise<boolean>;
+  deleteApiKey: (id: string) => Promise<boolean>;
+  createWebhook: (data: { name: string; url: string; events: string[] }) => Promise<{ success: boolean; webhook?: Webhook; message?: string }>;
+  updateWebhook: (id: string, data: Partial<Webhook>) => Promise<boolean>;
+  deleteWebhook: (id: string) => Promise<boolean>;
+  testWebhook: (id: string) => Promise<{ success: boolean; message: string }>;
 
   handleExport: () => void;
   handleImport: (file: File) => Promise<void>;
@@ -99,6 +119,16 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   const [reports, setReports] = useState<CampaignReport[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [settings, setSettings] = useState({ messagesPerHour: 65 });
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
+  const [availableWebhookEvents] = useState<string[]>([
+    'message.sent',
+    'message.failed',
+    'campaign.started',
+    'campaign.completed',
+    'campaign.stopped'
+  ]);
 
   const [token, setToken] = useLocalStorage<string | null>('osdsarvaya_token', null);
   const isAuthenticated = !!token;
@@ -125,6 +155,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // =========================
   const apiRequest = async <T,>(endpoint: string, method: string, body?: any): Promise<T> => {
     setAppError(null);
+    console.log(`apiRequest: ${method} /api${endpoint}`, body);
 
     const response = await fetch(`${BACKEND_URL}/api${endpoint}`, {
       method,
@@ -135,8 +166,11 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       body: body ? JSON.stringify(body) : undefined
     });
 
+    console.log(`apiRequest: ${method} /api${endpoint} status=${response.status}`);
+
     if (!response.ok) {
       const err = await response.json();
+      console.error(`apiRequest error:`, err);
       throw new Error(err.message || 'API error');
     }
 
@@ -162,6 +196,10 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
         reports: CampaignReport[];
         settings: { messagesPerHour: number };
         activities?: Activity[];
+        apiKeys?: ApiKey[];
+        webhooks?: Webhook[];
+        notificationLogs?: NotificationLog[];
+        isCampaignRunning?: boolean;
       }>('/data', 'GET');
 
       setContacts(data.contacts);
@@ -173,6 +211,18 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       
       if (data.activities) {
         setActivities(data.activities);
+      }
+      if (data.apiKeys) {
+        setApiKeys(data.apiKeys);
+      }
+      if (data.webhooks) {
+        setWebhooks(data.webhooks);
+      }
+      if (data.notificationLogs) {
+        setNotificationLogs(data.notificationLogs);
+      }
+      if (typeof data.isCampaignRunning === 'boolean') {
+        setCampaignRunning(data.isCampaignRunning);
       }
 
       // Fetch version from server (for display only, actual version from package.json)
@@ -366,6 +416,30 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  const updateContactsBulk = async (contacts: { phone: string; name?: string; email?: string; tags?: string }[]) => {
+    try {
+      const result = await apiRequest('/contacts/bulk-update', 'POST', contacts) as { 
+        updated: number; 
+        notFound: number; 
+        notFoundPhones?: string[];
+      };
+      await fetchData();
+      return result;
+    } catch {
+      return null;
+    }
+  };
+
+  const deleteContactsBulk = async (ids: string[]) => {
+    try {
+      await apiRequest('/contacts/bulk', 'DELETE', { ids });
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const addGroup = async (group: { name: string; contactIds: string[] }) => {
     const newGroup = { ...group, id: `group_${Date.now()}` };
     try {
@@ -495,6 +569,25 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  const cancelAllScheduledCampaigns = async () => {
+    try {
+      const result = await apiRequest('/campaigns/cancel-all', 'POST') as { cancelled?: number };
+      await fetchData();
+      return result.cancelled || 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const getFailedMessages = async (runId: string) => {
+    try {
+      const result = await apiRequest(`/campaigns/failed/${runId}`, 'GET') as { failedMessages?: FailedMessage[] };
+      return result.failedMessages || [];
+    } catch {
+      return [];
+    }
+  };
+
   // =========================
   // BACKUP
   // =========================
@@ -524,7 +617,6 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   const connectWhatsApp = async () => {
     console.log('CONNECT WA CLICKED via REST API');
     const token = localStorage.getItem('osdsarvaya_token');
-    console.log('Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'NULL');
     if (!token) {
       console.error('No token found!');
       return;
@@ -615,6 +707,88 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  // =========================
+  // API KEYS
+  // =========================
+  const createApiKey = async (name: string): Promise<{ success: boolean; apiKey?: any; message?: string }> => {
+    try {
+      console.log('createApiKey: starting request for', name);
+      const res = await apiRequest<any>('/api-keys', 'POST', { name });
+      console.log('createApiKey: response', res);
+      if (res && res.success) {
+        await fetchData();
+      }
+      return res;
+    } catch (err: any) {
+      console.error('createApiKey: error', err);
+      return { success: false, message: err.message || 'Failed to create API key' };
+    }
+  };
+
+  const toggleApiKey = async (id: string, isActive: boolean): Promise<boolean> => {
+    try {
+      await apiRequest(`/api-keys/${id}`, 'PUT', { isActive });
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const deleteApiKey = async (id: string): Promise<boolean> => {
+    try {
+      await apiRequest(`/api-keys/${id}`, 'DELETE');
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // =========================
+  // WEBHOOKS
+  // =========================
+  const createWebhook = async (data: { name: string; url: string; events: string[] }): Promise<{ success: boolean; webhook?: Webhook; message?: string }> => {
+    try {
+      const res = await apiRequest<any>('/webhooks', 'POST', data);
+      if (res.success) {
+        await fetchData();
+      }
+      return res;
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to create webhook' };
+    }
+  };
+
+  const updateWebhook = async (id: string, data: Partial<Webhook>): Promise<boolean> => {
+    try {
+      await apiRequest(`/webhooks/${id}`, 'PUT', data);
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const deleteWebhook = async (id: string): Promise<boolean> => {
+    try {
+      await apiRequest(`/webhooks/${id}`, 'DELETE');
+      await fetchData();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const testWebhook = async (id: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await apiRequest<any>(`/webhooks/${id}/test`, 'POST');
+      return { success: res.success, message: res.message || 'Test completed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Test failed' };
+    }
+  };
+
   const value = {
     contacts,
     groups,
@@ -631,6 +805,8 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     deleteContact,
     toggleContactOptStatus,
     addContactsBulk,
+    updateContactsBulk,
+    deleteContactsBulk,
     addGroup,
     updateGroup,
     deleteGroup,
@@ -647,6 +823,8 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     stopCampaignRun,
     scheduleCampaign,
     cancelQueuedCampaign,
+    cancelAllScheduledCampaigns,
+    getFailedMessages,
     showToast,
     toast,
     setToast,
@@ -658,6 +836,18 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     connectWhatsApp,
     disconnectWhatsApp,
     resetWhatsApp,
+
+    apiKeys,
+    webhooks,
+    notificationLogs,
+    availableWebhookEvents,
+    createApiKey,
+    toggleApiKey,
+    deleteApiKey,
+    createWebhook,
+    updateWebhook,
+    deleteWebhook,
+    testWebhook,
 
     handleExport,
     handleImport

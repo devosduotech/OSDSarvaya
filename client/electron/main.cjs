@@ -5,7 +5,6 @@ const log = require('electron-log');
 
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-software-rasterizer');
-app.commandLine.appendSwitch('no-sandbox');
 
 log.transports.file.level = 'info';
 log.transports.console.level = 'info';
@@ -148,8 +147,7 @@ function createWindow() {
     icon: path.join(__dirname, '..', 'public', 'icon.ico'),
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true,
-      webSecurity: false
+      contextIsolation: true
     },
     show: false
   });

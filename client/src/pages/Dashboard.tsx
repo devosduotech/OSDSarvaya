@@ -15,11 +15,34 @@ const Dashboard: React.FC = () => {
     campaignRuns,
     activities,
     isCampaignRunning,
-    stopCampaignRun
+    stopCampaignRun,
+    cancelAllScheduledCampaigns,
+    getFailedMessages,
+    showToast,
+    notificationLogs
   } = useAppContext();
 
   const [selectedCampaignRunId, setSelectedCampaignRunId] = useState<string>('');
   const [alert, setAlert] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [failedMessages, setFailedMessages] = useState<{contactPhone: string; contactName: string | null; reason: string}[]>([]);
+
+  const handleCancelAllScheduled = async () => {
+    const count = await cancelAllScheduledCampaigns();
+    if (count > 0) {
+      showToast(`${count} scheduled/queued campaigns cancelled`, 'success');
+    } else {
+      showToast('No scheduled campaigns to cancel', 'info');
+    }
+  };
+
+  // Fetch failed messages when campaign is selected
+  useEffect(() => {
+    if (selectedCampaignRunId) {
+      getFailedMessages(selectedCampaignRunId).then(setFailedMessages);
+    } else {
+      setFailedMessages([]);
+    }
+  }, [selectedCampaignRunId]);
 
   // Show alert only for the last campaign if failed and not yet acknowledged
   useEffect(() => {
@@ -97,6 +120,8 @@ const Dashboard: React.FC = () => {
     return { totalSent, totalFailed, total, successRate };
   }, [reports]);
 
+  const hasScheduledOrQueued = campaignRuns.some(r => r.status === 'Scheduled' || r.status === 'Queued');
+
   // =========================
   // ACTIVITY HELPERS
   // STATS
@@ -144,6 +169,27 @@ const formatTime = (timestamp: string | number | undefined) => {
         </div>
       )}
 
+      {/* ===== CAMPAIGN RUNNING BANNER ===== */}
+      {isCampaignRunning && (
+        <div className="xl:col-span-4">
+          <div className="p-4 rounded-lg bg-red-900/30 border border-red-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+              <span className="text-red-300 font-semibold">A campaign is currently running</span>
+            </div>
+            <button
+              onClick={stopCampaignRun}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition font-medium text-sm"
+            >
+              Stop Campaign
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ========================= */}
       {/* LEFT MAIN DASHBOARD */}
       {/* ========================= */}
@@ -165,9 +211,59 @@ const formatTime = (timestamp: string | number | undefined) => {
           <Card className="p-6 rounded-2xl shadow-sm border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700">
             <h3 className="text-sm text-slate-500 dark:text-slate-400">Groups</h3>
             <p className="mt-3 text-3xl font-bold text-slate-800 dark:text-white">{totalGroups}</p>
-          </Card>
+        </Card>
 
-        </div>
+        {/* ===== NOTIFICATION LOG ===== */}
+        {notificationLogs && notificationLogs.length > 0 && (
+          <Card className="p-6 rounded-2xl shadow-sm border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
+              Recent API Notifications
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b dark:border-slate-700">
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">Time</th>
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">Recipient</th>
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">API Key</th>
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">Status</th>
+                    <th className="text-left py-2 px-3 text-slate-500 dark:text-slate-400">External ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notificationLogs.slice(0, 10).map((log) => (
+                    <tr key={log.id} className="border-b dark:border-slate-700/50">
+                      <td className="py-2 px-3 text-slate-600 dark:text-slate-300">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </td>
+                      <td className="py-2 px-3 text-slate-600 dark:text-slate-300">
+                        {log.recipientName || log.recipientPhone}
+                      </td>
+                      <td className="py-2 px-3 text-slate-600 dark:text-slate-300">
+                        {log.apiKeyName || '-'}
+                      </td>
+                      <td className="py-2 px-3">
+                        <span className={`px-2 py-0.5 rounded text-xs ${
+                          log.status === 'sent' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                          log.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                          log.status === 'skipped' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                          'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                        }`}>
+                          {log.status}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-slate-500 dark:text-slate-400 text-xs font-mono">
+                        {log.externalId || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+      </div>
 
         {/* ===== OVERALL ANALYTICS ===== */}
         <Card className="p-6 rounded-2xl shadow-sm border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700">
@@ -218,6 +314,15 @@ const formatTime = (timestamp: string | number | undefined) => {
             <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
               Campaign Analysis
             </h2>
+
+            {hasScheduledOrQueued && (
+              <button
+                onClick={handleCancelAllScheduled}
+                className="text-xs px-2 py-1 bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800 transition"
+              >
+                Cancel All Scheduled
+              </button>
+            )}
 
             <select
               value={selectedCampaignRunId}
@@ -272,6 +377,28 @@ const formatTime = (timestamp: string | number | undefined) => {
                     />
                   </div>
 
+                </div>
+              )}
+
+              {/* FAILED MESSAGES */}
+              {failedMessages.length > 0 && (
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                  <h4 className="text-sm font-semibold text-red-700 dark:text-red-300 mb-2">
+                    Failed Messages ({failedMessages.length})
+                  </h4>
+                  <div className="max-h-40 overflow-y-auto text-xs space-y-1">
+                    {failedMessages.slice(0, 10).map((msg, i) => (
+                      <div key={i} className="flex justify-between text-red-600 dark:text-red-400">
+                        <span>{msg.contactName || msg.contactPhone}</span>
+                        <span className="truncate max-w-[150px]" title={msg.reason}>{msg.reason}</span>
+                      </div>
+                    ))}
+                    {failedMessages.length > 10 && (
+                      <div className="text-red-500 text-xs">
+                        ...and {failedMessages.length - 10} more
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

@@ -17,9 +17,6 @@ const Help: React.FC = () => {
         </ol>
         <p class="mt-4 text-yellow-400">Important: The license is tied to your machine. If you change computers, contact support for license transfer.</p>
         <p class="mt-2 text-gray-400">Your machine ID is automatically generated from hardware identifiers for security purposes.</p>
-        <div class="mt-4 p-3 bg-blue-900/30 border border-blue-500 rounded">
-          <p class="text-blue-300"><strong>Demo License:</strong> OSDS-8C3T-3GY3-UXYH with email info@osduotech.com</p>
-        </div>
       `
     },
     {
@@ -192,10 +189,227 @@ const Help: React.FC = () => {
       content: `
         <p class="mb-4">Configure how messages are sent in <strong>Settings</strong>:</p>
         <ul class="list-disc list-inside space-y-2 ml-2">
-          <li><strong>Messages per hour</strong>: Control sending speed (default: 65)</li>
+          <li><strong>Messages per hour</strong>: Control sending speed (default: 30)</li>
           <li><strong>Retry failed</strong>: Automatically retry up to 3 times</li>
         </ul>
-        <p class="mt-4">Lower the messages per hour if WhatsApp blocks your messages.</p>
+        <p class="mt-4">Lower the messages per hour if WhatsApp blocks your messages. We recommend staying below 40-50 msgs/hr to avoid restrictions.</p>
+      `
+    },
+    {
+      id: 'api-keys',
+      title: 'API Keys',
+      content: `
+        <p class="mb-4">API Keys allow third-party applications (ERP systems, CRMs, custom scripts) to authenticate with OSDSarvaya and send WhatsApp notifications programmatically.</p>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Creating an API Key:</h4>
+        <ol class="list-decimal list-inside space-y-1 ml-2">
+          <li>Navigate to <strong>Settings</strong> → <strong>API Keys</strong> tab</li>
+          <li>Click <strong>+ Create Key</strong></li>
+          <li>Enter a descriptive name (e.g., "ERP Integration", "CRM Bot")</li>
+          <li>Click <strong>Create</strong></li>
+          <li><span class="text-red-400 font-semibold">Important:</span> Copy the API key immediately! You will not be able to see it again.</li>
+        </ol>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Managing API Keys:</h4>
+        <ul class="list-disc list-inside space-y-1 ml-2">
+          <li><strong>Disable</strong> — Temporarily deactivate a key without deleting it</li>
+          <li><strong>Enable</strong> — Reactivate a disabled key</li>
+          <li><strong>Revoke</strong> — Permanently delete a key (cannot be undone)</li>
+        </ul>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Using an API Key:</h4>
+        <p class="mb-2">Include the API key in the <code class="bg-gray-700 px-1 rounded">x-api-key</code> HTTP header with every request:</p>
+        <div class="mt-2 p-3 bg-gray-900 rounded border border-gray-600 font-mono text-sm text-green-300">
+          <p>curl -X POST http://localhost:3001/api/notify/send \\</p>
+          <p class="ml-4">-H "Content-Type: application/json" \\</p>
+          <p class="ml-4">-H "x-api-key: osds_your_api_key_here" \\</p>
+          <p class="ml-4">-d '{"to": ["919876543210"], "message": "Hello!"}'</p>
+        </div>
+        <div class="mt-4 p-3 bg-yellow-900/30 border border-yellow-500 rounded">
+          <p class="text-yellow-300"><strong>Security:</strong> Treat API keys like passwords. Never share them publicly or commit them to version control.</p>
+        </div>
+      `
+    },
+    {
+      id: 'notification-api',
+      title: 'Notification API',
+      content: `
+        <p class="mb-4">The Notification API lets external applications send WhatsApp messages through OSDSarvaya. All endpoints require a valid API key in the <code class="bg-gray-700 px-1 rounded">x-api-key</code> header.</p>
+        <h4 class="font-semibold mt-4 mb-2 text-white">1. Send Direct Message — POST /api/notify/send</h4>
+        <p class="mb-2">Send a message to one or more phone numbers:</p>
+        <div class="mt-2 p-3 bg-gray-900 rounded border border-gray-600 font-mono text-xs text-green-300 whitespace-pre">{
+  "to": ["919876543210", "919123456789"],
+  "message": "Hello {{name}}, your order is ready!",
+  "variables": { "name": "John" },
+  "attachment": { "url": "https://example.com/file.pdf", "name": "Invoice.pdf" },
+  "externalId": "order-12345"
+}</div>
+        <p class="mt-3 text-gray-400 text-sm">Parameters:</p>
+        <ul class="list-disc list-inside ml-2 space-y-1 text-sm text-gray-300">
+          <li><strong>to</strong> (required) — Array of phone numbers with country code</li>
+          <li><strong>message</strong> (required) — Message text. Supports <code class="bg-gray-700 px-1 rounded">{{name}}</code>, <code class="bg-gray-700 px-1 rounded">{{phone}}</code>, <code class="bg-gray-700 px-1 rounded">{{email}}</code> variables</li>
+          <li><strong>variables</strong> (optional) — Key-value pairs for message personalization</li>
+          <li><strong>attachment</strong> (optional) — Object with <code class="bg-gray-700 px-1 rounded">url</code> and <code class="bg-gray-700 px-1 rounded">name</code></li>
+          <li><strong>externalId</strong> (optional) — Your own tracking ID for status lookups</li>
+        </ul>
+        <h4 class="font-semibold mt-6 mb-2 text-white">2. Send Bulk via Template — POST /api/notify/template</h4>
+        <p class="mb-2">Send a pre-defined template to specific numbers:</p>
+        <div class="mt-2 p-3 bg-gray-900 rounded border border-gray-600 font-mono text-xs text-green-300 whitespace-pre">{
+  "templateId": "camp_1716400000000",
+  "to": ["919876543210"],
+  "variables": { "name": "John" },
+  "externalId": "erp-order-456"
+}</div>
+        <h4 class="font-semibold mt-6 mb-2 text-white">3. Send Bulk via Group — POST /api/notify/bulk</h4>
+        <p class="mb-2">Send a template to all contacts in a group:</p>
+        <div class="mt-2 p-3 bg-gray-900 rounded border border-gray-600 font-mono text-xs text-green-300 whitespace-pre">{
+  "groupId": "group_1716400000000",
+  "templateId": "camp_1716400000000",
+  "externalId": "erp-bulk-789"
+}</div>
+        <p class="mt-3 text-sm text-gray-300">If a campaign is already running, the bulk request is automatically queued and will start when the current campaign finishes.</p>
+        <h4 class="font-semibold mt-6 mb-2 text-white">4. Check Status — GET /api/notify/status/:externalId</h4>
+        <p class="mb-2">Check delivery status using the <code class="bg-gray-700 px-1 rounded">externalId</code> you provided:</p>
+        <div class="mt-2 p-3 bg-gray-900 rounded border border-gray-600 font-mono text-sm text-green-300">GET /api/notify/status/order-12345</div>
+        <h4 class="font-semibold mt-6 mb-2 text-white">5. Notification Logs — GET /api/notify/logs</h4>
+        <p class="mb-2">View notification history with optional filters:</p>
+        <div class="mt-2 p-3 bg-gray-900 rounded border border-gray-600 font-mono text-sm text-green-300">GET /api/notify/logs?page=1&limit=50&status=sent</div>
+        <p class="mt-3 text-sm text-gray-300">Filter parameters: <code class="bg-gray-700 px-1 rounded">status</code>, <code class="bg-gray-700 px-1 rounded">apiKeyId</code>, <code class="bg-gray-700 px-1 rounded">fromDate</code>, <code class="bg-gray-700 px-1 rounded">toDate</code></p>
+        <div class="mt-4 p-3 bg-blue-900/30 border border-blue-500 rounded">
+          <p class="text-blue-300"><strong>Tip:</strong> Always use <code class="bg-gray-700 px-1 rounded">externalId</code> to track messages from your ERP system. This makes it easy to link notifications back to your orders, invoices, or records.</p>
+        </div>
+      `
+    },
+    {
+      id: 'webhooks',
+      title: 'Webhooks',
+      content: `
+        <p class="mb-4">Webhooks allow OSDSarvaya to push real-time event notifications to your external systems (ERP, CRM, etc.) when things happen — like messages being sent, campaigns completing, or message failures.</p>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Creating a Webhook:</h4>
+        <ol class="list-decimal list-inside space-y-1 ml-2">
+          <li>Navigate to <strong>Settings</strong> → <strong>Webhooks</strong> tab</li>
+          <li>Click <strong>+ Create Webhook</strong></li>
+          <li>Enter a <strong>name</strong> (e.g., "ERP Notification")</li>
+          <li>Enter the <strong>URL</strong> of your endpoint that will receive the data (e.g., <code class="bg-gray-700 px-1 rounded">https://your-erp.com/api/webhooks/osdsarvaya</code>)</li>
+          <li>Select the <strong>events</strong> you want to listen to</li>
+          <li>Click <strong>Create</strong></li>
+          <li><span class="text-red-400 font-semibold">Important:</span> Copy the webhook secret! You'll need it to verify payloads.</li>
+        </ol>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Available Events:</h4>
+        <ul class="list-disc list-inside ml-2 space-y-1">
+          <li><code class="bg-gray-700 px-1 rounded">message.sent</code> — A message was successfully sent</li>
+          <li><code class="bg-gray-700 px-1 rounded">message.failed</code> — A message failed to send</li>
+          <li><code class="bg-gray-700 px-1 rounded">campaign.started</code> — A campaign started sending</li>
+          <li><code class="bg-gray-700 px-1 rounded">campaign.completed</code> — A campaign finished all messages</li>
+          <li><code class="bg-gray-700 px-1 rounded">campaign.stopped</code> — A campaign was manually stopped</li>
+        </ul>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Webhook Payload Format:</h4>
+        <div class="mt-2 p-3 bg-gray-900 rounded border border-gray-600 font-mono text-xs text-green-300 whitespace-pre">{
+  "event": "message.sent",
+  "timestamp": "2026-05-22T14:30:00.000Z",
+  "data": {
+    "messageId": "msg_919876543210",
+    "recipientPhone": "919876543210",
+    "recipientName": "John Doe",
+    "status": "sent",
+    "campaignRunId": "run_1716400000000"
+  }
+}</div>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Verifying Webhook Authenticity:</h4>
+        <p class="mb-2">Each webhook delivery includes an HMAC-SHA256 signature in the headers. Verify it to ensure the request is from OSDSarvaya:</p>
+        <ul class="list-disc list-inside ml-2 space-y-1">
+          <li>Header: <code class="bg-gray-700 px-1 rounded">X-OSDSarvaya-Signature: sha256=&lt;hex_digest&gt;</code></li>
+          <li>Header: <code class="bg-gray-700 px-1 rounded">X-OSDSarvaya-Event: message.sent</code></li>
+        </ul>
+        <p class="mt-3 text-sm text-gray-300">To verify: compute HMAC-SHA256 of the raw request body using your webhook secret, then compare with the signature header.</p>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Testing a Webhook:</h4>
+        <p class="mb-2">Click the <strong>Test</strong> button next to any webhook to send a test payload to your endpoint. This helps verify your integration before going live.</p>
+        <div class="mt-4 p-3 bg-yellow-900/30 border border-yellow-500 rounded">
+          <p class="text-yellow-300"><strong>Retry Logic:</strong> If your endpoint is unavailable, OSDSarvaya will retry up to 3 times with increasing delays (1s, 5s, 25s).</p>
+        </div>
+      `
+    },
+    {
+      id: 'erp-integration',
+      title: 'ERP Integration Guide',
+      content: `
+        <p class="mb-4">OSDSarvaya can be integrated with any ERP system (SAP, Tally, Zoho, Frappe/ERPNext, etc.) using the API Keys and Webhooks features together.</p>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Typical Integration Flow:</h4>
+        <div class="my-4 p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+          <p class="text-white font-medium mb-2">Outbound (ERP → OSDSarvaya):</p>
+          <ol class="list-decimal list-inside space-y-2 ml-2">
+            <li>Create an <strong>API Key</strong> in OSDSarvaya Settings</li>
+            <li>Your ERP calls OSDSarvaya's <strong>/api/notify/send</strong> or <strong>/api/notify/bulk</strong> with the API key</li>
+            <li>OSDSarvaya sends the WhatsApp message(s)</li>
+          </ol>
+        </div>
+        <div class="my-4 p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+          <p class="text-white font-medium mb-2">Inbound (OSDSarvaya → ERP):</p>
+          <ol class="list-decimal list-inside space-y-2 ml-2">
+            <li>Create a <strong>Webhook</strong> in OSDSarvaya pointing to your ERP endpoint</li>
+            <li>Select events like <code class="bg-gray-700 px-1 rounded">message.sent</code>, <code class="bg-gray-700 px-1 rounded">message.failed</code>, <code class="bg-gray-700 px-1 rounded">campaign.completed</code></li>
+            <li>OSDSarvaya pushes event data to your ERP when messages are delivered or fail</li>
+            <li>Your ERP updates order/invoice status based on delivery results</li>
+          </ol>
+        </div>
+        <h4 class="font-semibold mt-4 mb-2 text-white">Example: Send Order Confirmation from ERPNext</h4>
+        <div class="mt-2 p-3 bg-gray-900 rounded border border-gray-600 font-mono text-xs text-green-300 whitespace-pre">import requests
+
+API_KEY = "osds_your_api_key_here"
+OSDS_URL = "http://localhost:3001/api/notify/send"
+
+payload = {
+    "to": ["91" + customer_phone],
+    "message": "Hello {{name}}, your order #{{order_id}} has been confirmed!",
+    "variables": {
+        "name": customer_name,
+        "order_id": sales_order_name
+    },
+    "externalId": sales_order_name
+}
+
+response = requests.post(
+    OSDS_URL,
+    json=payload,
+    headers={
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY
+    }
+)
+
+print(response.json())</div>
+        <h4 class="font-semibold mt-6 mb-2 text-white">Example: Receive Delivery Status in ERPNext</h4>
+        <div class="mt-2 p-3 bg-gray-900 rounded border border-gray-600 font-mono text-xs text-green-300 whitespace-pre">import hashlib, hmac, json
+import frappe
+
+@frappe.whitelist(allow_http=True)
+def osdsarvaya_webhook():
+    signature = frappe.request.headers.get(
+        "X-OSDSarvaya-Signature", ""
+    )
+    event = frappe.request.headers.get(
+        "X-OSDSarvaya-Event", ""
+    )
+    payload = frappe.request.get_json()
+
+    # Verify signature
+    secret = frappe.get_single_value(
+        "OSDSarvaya Settings", "webhook_secret"
+    )
+    expected = "sha256=" + hmac.new(
+        secret.encode(),
+        frappe.request.data,
+        hashlib.sha256
+    ).hexdigest()
+
+    if signature != expected:
+        frappe.throw("Invalid signature")
+
+    # Process event
+    if event == "message.sent":
+        external_id = payload.get("data", {}).get("externalId")
+        # Update your Sales Order status
+        frappe.db.set_value(
+            "Sales Order", external_id,
+            "osds_status", "WhatsApp Sent"
+        )</div>
       `
     },
     {

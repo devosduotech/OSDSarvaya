@@ -20,9 +20,12 @@ function getDbPath() {
 
 let db = null;
 let SQL = null;
+// While a transaction is open, per-write disk saves are suppressed so that
+// rolled-back data never reaches the disk file.
+let inTransaction = false;
 
 function saveDatabase() {
-    if (db) {
+    if (db && !inTransaction) {
         try {
             const data = db.export();
             const buffer = Buffer.from(data);
@@ -30,7 +33,14 @@ function saveDatabase() {
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
-            fs.writeFileSync(getDbPath(), buffer);
+
+            // Create a backup of the current db file before writing new data
+            const dbPath = getDbPath();
+            if (fs.existsSync(dbPath)) {
+                fs.copyFileSync(dbPath, dbPath + '.bak');
+            }
+
+            fs.writeFileSync(dbPath, buffer);
         } catch (e) {
             logger.error({ e }, 'Failed to save database');
         }
@@ -84,6 +94,33 @@ const dbWrapper = {
             saveDatabase();
         } catch (e) {
             logger.error({ e, sql }, 'DB exec error');
+            throw e;
+        }
+    },
+    // Runs fn inside a SQL transaction. On success the transaction is
+    // committed and the database is persisted once; on any thrown error
+    // (including inside async callbacks) everything is rolled back.
+    transaction: async (fn) => {
+        if (typeof fn !== 'function') {
+            throw new Error('transaction() requires a callback function');
+        }
+
+        db.run('BEGIN');
+        inTransaction = true;
+
+        try {
+            const result = await fn(dbWrapper);
+            db.run('COMMIT');
+            inTransaction = false;
+            saveDatabase();
+            return result;
+        } catch (e) {
+            try {
+                db.run('ROLLBACK');
+            } catch (rollbackErr) {
+                logger.error({ e: rollbackErr }, 'DB rollback failed');
+            }
+            inTransaction = false;
             throw e;
         }
     }
@@ -180,6 +217,18 @@ const initializeDb = async () => {
         `);
 
         db.run(`
+            CREATE TABLE IF NOT EXISTS failed_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                campaignRunId TEXT NOT NULL,
+                contactPhone TEXT NOT NULL,
+                contactName TEXT,
+                reason TEXT NOT NULL,
+                createdAt TEXT NOT NULL,
+                FOREIGN KEY (campaignRunId) REFERENCES campaign_runs(id) ON DELETE CASCADE
+            )
+        `);
+
+        db.run(`
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -246,13 +295,78 @@ const initializeDb = async () => {
             )
         `);
 
-        db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('messagesPerHour', '65')");
+        // API Keys table for third-party notification API access
+        db.run(`
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                key_hash TEXT NOT NULL UNIQUE,
+                key_prefix TEXT NOT NULL,
+                rate_limit INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT NOT NULL,
+                last_used_at TEXT
+            )
+        `);
+
+        // Webhooks table for event notifications
+        db.run(`
+            CREATE TABLE IF NOT EXISTS webhooks (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                url TEXT NOT NULL,
+                secret TEXT NOT NULL,
+                events TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT NOT NULL,
+                api_key_id TEXT
+            )
+        `);
+
+        // Notification log for API-driven messages
+        db.run(`
+            CREATE TABLE IF NOT EXISTS notification_log (
+                id TEXT PRIMARY KEY,
+                api_key_id TEXT,
+                api_key_name TEXT,
+                recipient_phone TEXT NOT NULL,
+                recipient_name TEXT,
+                message TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                campaign_run_id TEXT,
+                external_id TEXT,
+                error TEXT,
+                created_at TEXT NOT NULL,
+                delivered_at TEXT
+            )
+        `);
+
+        // Add external_id column to campaign_runs if not exists (for API tracking)
+        try {
+            db.run('ALTER TABLE campaign_runs ADD COLUMN external_id TEXT');
+        } catch (e) {
+            // Column already exists, ignore
+        }
+
+        // v2 migrations: ensure new tables exist for upgrades from v1
+        try { db.run(`CREATE TABLE IF NOT EXISTS api_keys (id TEXT PRIMARY KEY, name TEXT NOT NULL, key_hash TEXT NOT NULL UNIQUE, key_prefix TEXT NOT NULL, rate_limit INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1, created_at TEXT NOT NULL, last_used_at TEXT)`); } catch (e) { /* exists */ }
+        try { db.run(`CREATE TABLE IF NOT EXISTS webhooks (id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL, secret TEXT NOT NULL, events TEXT NOT NULL, is_active INTEGER DEFAULT 1, created_at TEXT NOT NULL, api_key_id TEXT)`); } catch (e) { /* exists */ }
+        try { db.run(`CREATE TABLE IF NOT EXISTS notification_log (id TEXT PRIMARY KEY, api_key_id TEXT, api_key_name TEXT, recipient_phone TEXT NOT NULL, recipient_name TEXT, message TEXT, status TEXT NOT NULL DEFAULT 'pending', campaign_run_id TEXT, external_id TEXT, error TEXT, created_at TEXT NOT NULL, delivered_at TEXT)`); } catch (e) { /* exists */ }
+
+        db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('messagesPerHour', '30')");
         db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('maxRetries', '3')");
+
+        // Indexes for hot lookups as logs grow
+        db.run('CREATE INDEX IF NOT EXISTS idx_notification_log_external_id ON notification_log(external_id)');
+        db.run('CREATE INDEX IF NOT EXISTS idx_notification_log_created_at ON notification_log(created_at)');
+        db.run('CREATE INDEX IF NOT EXISTS idx_notification_log_api_key_id ON notification_log(api_key_id)');
 
         saveDatabase();
         logger.info('Database schema verified and is up-to-date.');
 
-        setInterval(saveDatabase, 30000);
+        const autosave = setInterval(saveDatabase, 30000);
+        // Don't keep the process alive just for the autosave timer
+        if (autosave.unref) autosave.unref();
 
         return dbWrapper;
     } catch (err) {

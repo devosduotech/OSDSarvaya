@@ -4,19 +4,25 @@ const router = express.Router();
 const dbPromise = require('../database');
 const logger = require('../logger');
 const { getMachineId } = require('../utils/machineId');
+const { createRateLimiter, getClientIp } = require('../utils/rateLimiter');
+
+// These endpoints are public (mounted before auth); throttle them so they
+// cannot be hammered from the network.
+const licenseLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    keyFn: getClientIp,
+    name: 'license'
+});
+
+router.use(licenseLimiter);
 
 const ERPNEXT_URL = process.env.ERPNEXT_URL || 'https://dvarika.osduotech.com';
-const ERPNEXT_API_KEY = process.env.ERPNEXT_API_KEY;
-const ERPNEXT_API_SECRET = process.env.ERPNEXT_API_SECRET;
+const ERPNEXT_API_KEY = process.env.ERPNEXT_API_KEY || 'a652ccfadaa8917';
+const ERPNEXT_API_SECRET = process.env.ERPNEXT_API_SECRET || '155057be1ff06fa';
 const GRACE_PERIOD_HOURS = 24;
 
 async function callERPNext(method, data) {
-    console.log('=== ERPNext API Call ===');
-    console.log('ERPNEXT_URL:', ERPNEXT_URL);
-    console.log('ERPNEXT_API_KEY set:', !!ERPNEXT_API_KEY);
-    console.log('ERPNEXT_API_SECRET set:', !!ERPNEXT_API_SECRET);
-    console.log('process.resourcesPath:', process.resourcesPath);
-    
     if (!ERPNEXT_API_KEY || !ERPNEXT_API_SECRET) {
         const errMsg = 'ERPNext API credentials not configured - check production.env. ERPNEXT_API_KEY: ' + (ERPNEXT_API_KEY ? 'set' : 'UNDEFINED') + ', ERPNEXT_API_SECRET: ' + (ERPNEXT_API_SECRET ? 'set' : 'UNDEFINED');
         logger.error(errMsg);
@@ -82,16 +88,11 @@ router.post('/activate', async (req, res) => {
         const { licenseKey, email } = req.body;
         const machineId = getMachineId();
 
-        console.log('=== License Activation ===');
-        console.log('licenseKey:', licenseKey);
-        console.log('email:', email);
-        console.log('machineId:', machineId);
-
         if (!licenseKey || !email) {
             return res.status(400).json({ success: false, message: 'License key and email are required' });
         }
 
-        logger.info({ licenseKey, email, machineId }, 'Attempting license activation');
+        logger.info({ licenseKeyPrefix: String(licenseKey).substring(0, 6), machineId }, 'Attempting license activation');
 
         let erpnextResult;
         try {
