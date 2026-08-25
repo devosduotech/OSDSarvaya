@@ -1,5 +1,6 @@
 services:
   osdsarvaya:
+    image: ghcr.io/devosduotech/osdsarvaya:${APP_VERSION:-2.0.1}
     build:
       context: .
       args:

@@ -29,6 +29,12 @@ cd OSDSarvaya
 ./build.sh
 ```
 
+Or pull the pre-built image from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/devosduotech/osdsarvaya:2.0.1
+```
+
 Access at: http://localhost:3001
 
 ---
