@@ -4,6 +4,8 @@
 
 WhatsApp Bulk Messaging Application by OSDuo Tech
 
+**Current version: v2.0.1**
+
 </div>
 
 ---
@@ -18,24 +20,46 @@ WhatsApp Bulk Messaging Application by OSDuo Tech
 4. Activate license (requires internet)
 5. Scan WhatsApp QR code to connect
 
-### Ubuntu
+### Ubuntu / Docker
+
+Pull the pre-built image from GitHub Container Registry:
 
 ```bash
-# Clone repository
-git clone https://github.com/devosduotech/OSDSarvaya.git
-cd OSDSarvaya
-
-# Build and run
-./build.sh
+docker pull ghcr.io/devosduotech/osdsarvaya:latest   # or pin: :2.0.1
 ```
 
-Or pull the pre-built image from GitHub Container Registry:
+Or build locally with Docker Compose:
 
 ```bash
-docker pull ghcr.io/devosduotech/osdsarvaya:2.0.1
+git clone https://github.com/devosduotech/OSDSarvaya.git
+cd OSDSarvaya
+APP_VERSION=2.0.1 docker compose up -d --build
 ```
 
 Access at: http://localhost:3001
+
+See [UPGRADE.md](UPGRADE.md) for upgrading existing installations.
+
+---
+
+## Features
+
+### Messaging
+- WhatsApp bulk messaging with per-hour rate limiting
+- Campaign templates with variables (`{{name}}`, etc.) and attachments
+- Group messaging, campaign queue (auto-start) and scheduling
+- Automatic retry of failed sends (targeted, with accurate reporting)
+- STOP / START / UNSUBSCRIBE opt-out handling via WhatsApp replies
+
+### Platform (v2)
+- **REST Notification API** for ERP/system integrations (`/api/notify/*`)
+- **API Keys** (`osds_...`) with per-key management
+- **Webhooks** with HMAC-SHA256 signatures and automatic retries
+- Activity logs, dark mode, backup & restore (atomic)
+
+### Licensing
+- License activation via ERPNext integration
+- 24-hour offline grace period
 
 ---
 
@@ -49,39 +73,20 @@ On first launch, the application will prompt you to create an admin account:
    - Username: min 3 characters
    - Password: min 8 characters, 1 uppercase, 1 number
 4. After setup, login with your credentials
+5. Go to Settings → License & About → enter License Key and Email → Activate
 
 ---
 
-## Default Credentials (After Setup)
+## Documentation
 
-- **Username:** (you choose during setup)
-- **Password:** (you choose during setup)
+| Document | Purpose |
+|----------|---------|
+| [USER_MANUAL.md](USER_MANUAL.md) | Configuration, deployment, usage |
+| [UPGRADE.md](UPGRADE.md) | Upgrading existing installations |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [ROADMAP.md](ROADMAP.md) | Pending work & release planning |
 
----
-
-## Features
-
-- WhatsApp Bulk Messaging
-- Contact Management with Opt-in/Out
-- Campaign Templates
-- Group Messaging
-- Activity Logs
-- Dark Mode Support
-- Campaign Queue (auto-start)
-- **License Activation (ERPNext integration)**
-- 24-hour offline grace period
-
----
-
-## License Activation
-
-OSDSarvaya requires license activation via ERPNext.
-
-### Activation Steps:
-1. Login to the application
-2. Go to Settings → License & About
-3. Enter License Key and Email
-4. Click "Activate License"
+The in-app Help and FAQ pages document the Notification API, API Keys, Webhooks, and ERP integration examples (ERPNext/Frappe).
 
 ---
 
