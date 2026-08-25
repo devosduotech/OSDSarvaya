@@ -1,89 +1,132 @@
+# OSDSarvaya — User Manual
 
-# OSDSarvaya - User Manual
+Applies to **v2.0.1**.
 
 ## 1. Introduction
-Welcome to OSDSarvaya! This document guides you through the setup, configuration, and usage of the OSDSarvaya application, now updated with production-ready features for security and reliability.
+
+OSDSarvaya is a locally deployable WhatsApp campaign automation platform for
+secure, controlled bulk messaging — personalized messages with attachments to
+targeted contact groups, without third-party SaaS messaging providers.
 
 ---
+
 ## 2. Configuration
-Before running the application, you need to configure it using environment variables. Create a `.env` file inside the `server/` directory by copying the `server/.env.example` file.
+
+Configuration comes from `production.env` (repo root; Docker Compose loads it via `env_file`).
+There is no `.env` in the server directory for production use.
 
 ```bash
-# Example server/.env file
 NODE_ENV=production
 PORT=3001
-CORS_ORIGIN=http://your-domain.com
-JWT_SECRET=a_very_long_and_secure_random_string
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your_secure_password
+CORS_ORIGIN=http://localhost:3001
+JWT_SECRET=<long-random-string>        # REQUIRED — see Security note below
+MESSAGES_PER_HOUR=30                   # default send rate
+ERPNEXT_URL=https://<your-erpnext-site>
+ERPNEXT_API_KEY=<key>
+ERPNEXT_API_SECRET=<secret>
 ```
 
-| Variable         | Description                                                               |
-|------------------|---------------------------------------------------------------------------|
-| `NODE_ENV`       | Set to `production` for deployments.                                      |
-| `PORT`           | The port the server will run on.                                          |
-| `CORS_ORIGIN`    | The URL of your frontend. Must be set for security.                       |
-| `JWT_SECRET`     | A long, random string for securing login sessions.                        |
-| `ADMIN_USERNAME` | The username for logging into the application.                          |
-| `ADMIN_PASSWORD` | The password for logging into the application. **Change this!**         |
+> **Security note:** v2.0.1 still falls back to a built-in default if `JWT_SECRET`
+> is unset. Always set a long random value (`openssl rand -hex 32`). This is being
+> made mandatory in v2.0.2 (see ROADMAP.md).
+
+| Variable | Description |
+|----------|-------------|
+| `NODE_ENV` | `production` for deployments |
+| `PORT` | Server port (default 3001) |
+| `CORS_ORIGIN` | Allowed browser origin (`*` by default) |
+| `JWT_SECRET` | Secret used to sign admin login tokens |
+| `MESSAGES_PER_HOUR` | Global default send rate |
+| `ERPNEXT_*` | License server connection |
 
 ---
-## 3. Production Deployment (Recommended)
-The recommended way to deploy OSDSarvaya is using the provided `Dockerfile`.
 
-### 3.1. Building the Docker Image
-1.  Navigate to the project's root directory.
-2.  Run the build command: `docker build -t osdsarvaya .`
+## 3. Deployment
 
-### 3.2. Running the Docker Container
-Run the container with volumes to persist your WhatsApp session and database, and an environment file for configuration.
+### 3.1 Docker Compose (recommended)
 
-1. Create your `production.env` file in a secure location on your host with the production configuration from section 2.
-2. Run the command:
 ```bash
-docker run -d -p 3001:3001 --name osdsarvaya-app \
-  -v osdsarvaya_session:/app/server/.wwebjs_auth \
-  -v osdsarvaya_data:/app/server/data \
-  --env-file ./path/to/your/production.env \
-  --restart unless-stopped \
-  osdsarvaya
+git clone https://github.com/devosduotech/OSDSarvaya.git
+cd OSDSarvaya
+APP_VERSION=2.0.1 docker compose up -d --build     # or: docker compose pull && docker compose up -d
 ```
-*   `-v osdsarvaya_session:/app/server/.wwebjs_auth`: **(Critical)** Persists your WhatsApp login session.
-*   `-v osdsarvaya_data:/app/server/data`: **(Critical)** Persists your SQLite database file.
-*   `--env-file`: Securely passes your configuration to the container.
 
-### 3.3. Accessing the Application
-Navigate your browser to `http://<your_server_ip>:3001`.
+The compose file persists:
+- `./osdsarvaya_session` → WhatsApp Web login session
+- `./osdsarvaya_data` → SQLite database + license cache
 
----
-## 4. Local Development Setup
-**1. Backend:**
-- Create a `.env` file in the `server` directory.
-- `cd server`, run `npm install`, then `npm start`.
+Healthcheck runs every 30s against `/api/health`.
 
-**2. Frontend:**
-- `cd client`, run `npm install`, then `npm run dev`.
-- Access the app at `http://localhost:5173`.
+### 3.2 Pre-built image
 
----
-## 5. Application Usage Guide
+```bash
+docker pull ghcr.io/devosduotech/osdsarvaya:2.0.1   # or :latest
+```
 
-### 5.1. Authentication
-- On first access, you will be directed to a login page.
-- Use the `ADMIN_USERNAME` and `ADMIN_PASSWORD` you configured in your `.env` file to sign in.
+### 3.3 Windows desktop
 
-### 5.2. Connecting to WhatsApp
-- This process remains the same. Navigate to **Settings** and scan the QR code.
+Download `OSDSarvayaSetup.exe` from [Releases](../../releases) and install.
+Data lives in `%APPDATA%\OSDSarvaya\data`.
 
-### 5.3. Backup and Restore
-- On the **Settings** page, you'll find a new "Backup & Restore" section.
-- **Export Data:** Click this to download a single JSON file containing all your application data. Store this file securely.
-- **Import Data:** Click this to upload a previously exported backup file. **Warning:** Importing will overwrite all existing data.
+### 3.4 First-time setup
+
+1. Open http://localhost:3001 → you are redirected to the Setup page
+2. Create the admin account (username ≥ 3 chars; password ≥ 8 chars with 1 uppercase and 1 number)
+3. Log in
+4. Settings → **License & About** → enter License Key + Email → **Activate License** (needs internet)
+5. Connect WhatsApp (next section)
 
 ---
+
+## 4. Connecting WhatsApp
+
+Settings → scan the QR code with the phone linked to your WhatsApp account.
+Status is shown live; the app auto-reconnects after brief disconnects.
+If authentication fails, disconnect and re-scan.
+
+**Opt-out handling:** incoming messages `STOP` / `UNSUBSCRIBE` mark the contact
+opted-out; `START` / `SUBSCRIBE` / `OPTIN` opts them back in.
+
+---
+
+## 5. Application usage
+
+### Campaigns
+Create templates (with `{{name}}`-style variables and optional attachments),
+select groups, then **Start** (runs immediately), **Schedule**, or queue while
+another campaign is running. The Dashboard shows a live banner while a campaign
+is running with a Stop button. Failed sends are retried automatically.
+
+### Contacts & groups
+Import contacts (CSV/bulk), manage opt-in status individually or in bulk,
+organize into groups.
+
+### Backup & restore
+Settings → Backup & Restore. Export downloads a JSON snapshot; Import restores it.
+Restores are atomic since v2.0.1 — either everything applies or nothing changes.
+Keep exported backups secure (they contain contact PII).
+
+### Integrations (v2)
+- **API Keys** (Settings): create `osds_...` keys for external systems. The full key is shown once.
+- **Notification API**: `POST /api/notify/send`, `/template`, `/bulk`; status via `/status/:externalId`. Auth header: `x-api-key`.
+- **Webhooks**: subscribe to `message.sent`, `message.failed`, `campaign.completed`, etc. Payloads are signed (`X-OSDSarvaya-Signature: sha256=<hmac>`).
+
+Full endpoint documentation with curl examples: in-app **Help** page;
+ERPNext/Frappe integration samples: in-app **Help → ERP Integration Guide**.
+
+---
+
 ## 6. Troubleshooting
-For connection issues, the first step is always to check the logs.
-- **Docker:** `docker logs -f osdsarvaya-app`
-- **Local Development:** Check the terminal where you ran `npm start` in the `server` directory.
 
-Common errors are related to missing system dependencies for the browser automation, which are handled by the Dockerfile but may be missing on a local machine.
+Check logs first:
+- Docker: `docker logs -f osdsarvaya-app`
+- Windows: `%APPDATA%\OSDSarvaya\logs` (electron-log)
+- Dev: terminal running the server
+
+| Problem | Likely cause / fix |
+|---------|--------------------|
+| QR never appears | Chromium missing/deps — Docker image ships Chromium; on bare metal install deps per Dockerfile |
+| "WhatsApp not connected" when starting campaigns | Reconnect from Settings first |
+| Healthcheck unhealthy | Wait ~30s after boot; check logs for DB/permission errors |
+| Login rejected after restart | `JWT_SECRET` changed between runs — keep it stable in production.env |
+| Rate limited (HTTP 429) | Too many requests — see Retry-After header; login is limited to 20/15min per IP |

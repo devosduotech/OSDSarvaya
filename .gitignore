@@ -27,7 +27,6 @@ dist-ssr
 osdsarvaya_data/
 osdsarvaya_session/
 production.env
-UPDATE.md
 *.db
 *.db.bak
 
