@@ -7,6 +7,14 @@ npm-debug.log
 # Generated Electron helper copy (contains its own node_modules)
 client/server
 
+# CI, tests and e2e tooling (not needed inside the image)
+.github
+tests
+playwright.config.js
+package.json
+package-lock.json
+docker-compose.build.yml
+
 # Server session data and local database
 server/.wwebjs_auth/
 server/data/
@@ -42,12 +50,12 @@ logs
 .git
 .gitignore
 
-# Documentation (optional but cleaner)
+# Documentation / tooling not needed inside the image
 README.md
 USER_MANUAL.md
-DEPLOYMENT_GUIDE.md
-
-# Docker files not needed inside image
+CHANGELOG.md
+UPGRADE.md
+ROADMAP.md
 docker-compose.yml
 
 # OS temp files

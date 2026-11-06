@@ -32,7 +32,6 @@
     "whatsapp-web.js": "^1.34.6"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.7.2",
     "@types/node": "^20.12.12",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.2.66",
@@ -72,7 +71,9 @@
       {
         "from": "chrome-win64",
         "to": "chrome-win64",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {

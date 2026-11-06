@@ -1,7 +1,15 @@
 # Roadmap & Pending Work
 
-Status as of **v2.0.1** (2026-08-25). This is the planning source of truth —
+Status as of **v2.0.2** (2026-11-06). This is the planning source of truth —
 update it when items are picked up or completed.
+
+> v2.0.2 (2026-11-06) shipped toolchain/WhatsApp reliability: Docker builds on
+> node:22-bookworm with Puppeteer's bundled Chrome, `whatsapp-web.js` pinned to
+> upstream `main` (064a3d5a) fixing the "authenticated but never ready" hang,
+> persistent session across restarts, pull-only Docker Compose, GHCR release
+> workflow (v* tags → `<version>` + `latest`), Windows NSIS installer workflow,
+> and docs/example-env refresh. The security criticals below were NOT part of
+> v2.0.2 and remain the top priority for v2.0.3.
 
 ---
 
@@ -12,9 +20,9 @@ in v2.0.1. The critical items were deliberately deferred.
 
 | # | Finding | Severity | Status |
 |---|---------|----------|--------|
-| 1 | Default/hardcoded JWT secret fallback (`server.js`), default secret shipped in `production.env` + Windows installer → admin token forgery possible on default installs | Critical | ⬜ Pending (v2.0.2) |
-| 2 | ERPNext license API credentials hardcoded in source & git history | Critical | ⬜ Pending (v2.0.2) |
-| 3 | `/api/license/*` routes unauthenticated (activate/deactivate/status/machine-id) | Critical | ⬜ Pending (v2.0.2) |
+| 1 | Default/hardcoded JWT secret fallback (`server.js`), default secret shipped in `production.env` + Windows installer → admin token forgery possible on default installs | Critical | ⬜ Pending (v2.0.3) |
+| 2 | ERPNext license API credentials hardcoded in source & git history | Critical | ⬜ Pending (v2.0.3) |
+| 3 | `/api/license/*` routes unauthenticated (activate/deactivate/status/machine-id) | Critical | ⬜ Pending (v2.0.3) |
 | 4 | Duplicate campaign sends (multi-group contacts; retry-all) | High | ✅ v2.0.1 |
 | 5 | WhatsApp auto-reconnect crash | High | ✅ v2.0.1 |
 | 6 | Broken change-password flow | High | ✅ v2.0.1 |
@@ -26,7 +34,9 @@ in v2.0.1. The critical items were deliberately deferred.
 
 ## 2. Proposed releases
 
-### v2.0.2 — Security criticals (#1–#3)
+### v2.0.3 — Security criticals (#1–#3)
+
+(The v2.0.2 version number was consumed by the 2026-11-06 reliability release, see above.)
 - [ ] Refuse to start without a strong `JWT_SECRET`; generate & persist one at first-run setup
 - [ ] Rotate ERPNext API key/secret at the ERPNext side, then remove all hardcoded values from code
 - [ ] Purge credentials from git history (`git filter-repo`) — requires force-push coordination
@@ -50,13 +60,15 @@ in v2.0.1. The critical items were deliberately deferred.
 - [ ] Request size caps per endpoint
 
 ### Infrastructure (continuous)
+- [x] Release automation: every `v*` tag publishes GHCR images (`<version>` + `latest`) — v2.0.2
+- [x] Release automation: every `v*` tag builds the Windows NSIS installer and attaches it to the release — v2.0.2
 - [ ] GitHub Actions CI: install → lint/typecheck → jest → docker build on push/PR
+- [ ] Backfill release page for v2.0.1 (GHCR only)
 - [ ] Multi-arch Docker images (amd64 + arm64)
 - [ ] Windows installer code signing certificate (removes SmartScreen warnings)
-- [ ] Create backfill release page for v2.0.0 (releases jump v1.1.31 → v2.0.1 today)
 
 ## 3. Known small debts
 - README previously referenced a missing `build.sh` (fixed in docs; decide whether to actually provide the script)
 - `fluent-ffmpeg` coverage reports bloat packaged node_modules (~10s of MB) — prune in packaging step
-- `@electron/rebuild` devDependency unused by electron-builder — remove
-- `production.env.example` should be committed as template (real `production.env` stays gitignored)
+- ~~`production.env.example` committed as template~~ — done in v2.0.2
+- `@electron/rebuild` devDependency removed (unused by electron-builder) — done in v2.0.2

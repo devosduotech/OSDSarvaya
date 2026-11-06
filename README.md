@@ -45,6 +45,9 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 
 Access at: http://localhost:3001
 
+Copy `production.env.example` → `production.env` and fill in real values
+(a strong `JWT_SECRET` is required in production).
+
 See [UPGRADE.md](UPGRADE.md) for upgrading existing installations.
 
 ---
