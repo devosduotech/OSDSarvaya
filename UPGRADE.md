@@ -1,36 +1,43 @@
 # Upgrade Guide
 
 How to update an existing OSDSarvaya installation. Your WhatsApp session
-(`osdsarvaya_session`) and database (`osdsarvaya_data`) are preserved across
-upgrades — always confirm both volumes exist before upgrading.
+(`osdsarvaya_data`) are preserved across
+upgrades — always confirm the volume exists before upgrading.
+
+> Since **v2.0.2** the WhatsApp session lives inside `osdsarvaya_data`
+> (`osdsarvaya_data/.wwebjs_auth`, mounted at `/app/server/data`). The old
+> separate `osdsarvaya_session` mount is no longer used.
 
 ---
 
 ## Docker (Ubuntu / production servers)
 
-### Patch upgrade (e.g. 2.0.0 → 2.0.1)
+### Patch upgrade (e.g. 2.0.1 → 2.0.2)
 
 ```bash
 cd /path/to/OSDSarvaya
 git pull                          # or download the new tag
 docker compose pull               # use pre-built GHCR image, then:
-docker compose up -d --no-build
+docker compose up -d
+
+# — or pin explicitly —
+APP_VERSION=2.0.2 docker compose up -d
 
 # — or build locally —
-APP_VERSION=2.0.1 docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
 Verify after upgrade:
 
 ```bash
-curl http://localhost:3001/api/version    # expect appVersion 2.0.1
+curl http://localhost:3001/api/version    # expect appVersion 2.0.2
 docker logs -f osdsarvaya-app             # watch startup + scheduler lines
 ```
 
 ### Rollback
 
 ```bash
-APP_VERSION=2.0.0 docker compose up -d --build
+APP_VERSION=2.0.1 docker compose up -d
 ```
 
 > Note: rolling back after the database has been migrated may not be supported.
@@ -64,6 +71,6 @@ Rollback: install the older setup exe over it (data is kept).
 | Symptom | Fix |
 |---------|-----|
 | `/api/version` shows old version | Image not rebuilt/pulled — run with explicit `APP_VERSION`, check `docker images` |
-| WhatsApp asks to re-scan QR | Session volume missing — check `osdsarvaya_session` mount exists |
+| WhatsApp asks to re-scan QR | Session missing — check `osdsarvaya_data/.wwebjs_auth` on the host (session is inside `osdsarvaya_data` since v2.0.2); if you upgraded from an older install, the old `osdsarvaya_session` mount is unused, not migrated |
 | Container restart-looping | `docker logs osdsarvaya-app`; usually a bad `production.env` value |
 | Healthcheck failing | Give Chromium ~30s on first boot; check `docker inspect --format '{{.State.Health.Status}}' osdsarvaya-app` |

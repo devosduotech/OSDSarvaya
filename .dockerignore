@@ -1,15 +1,24 @@
 
 # Node.js
-node_modules
+**/node_modules
 npm-debug.log
 .DS_Store
 
-# Server session data
+# Generated Electron helper copy (contains its own node_modules)
+client/server
+
+# Server session data and local database
 server/.wwebjs_auth/
+server/data/
+osdsarvaya_session/
+osdsarvaya_data/
+*.db
+*.db.bak
 
 # Client build output
 client/dist
-client/node_modules
+client/electron/release
+client/electron/dist
 
 # IDE and OS files
 .vscode

@@ -1,4 +1,4 @@
-FROM node:18-bullseye
+FROM node:22-bookworm
 
 # -----------------------------
 # Build Arguments
@@ -8,51 +8,25 @@ ARG APP_VERSION=__VERSION__
 # -----------------------------
 # Install Chromium + Dependencies
 # -----------------------------
-RUN apt-get update && apt-get install -y \
+# Debian bookworm is still supported and ships a current Chromium.
+# The chromium package pulls in all required runtime libraries itself.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
-    libgbm1 \
     fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libc6 \
-    libcairo2 \
-    libcups2 \
-    libdbus-1-3 \
-    libexpat1 \
-    libfontconfig1 \
-    libgcc1 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libstdc++6 \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
-    libxrandr2 \
-    libxrender1 \
-    libxss1 \
-    libxtst6 \
     ca-certificates \
-    --no-install-recommends \
+    curl \
  && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
 # Global Environment Variables
 # -----------------------------
 ENV NODE_ENV=production
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV APP_VERSION=${APP_VERSION}
+
+# Let Puppeteer download its own Chrome build. Debian's system Chromium is
+# known to hang WhatsApp Web after authentication (the `ready` event never
+# fires), while Puppeteer's bundled Chrome works.
+ENV PUPPETEER_CACHE_DIR=/root/.cache/puppeteer
 
 WORKDIR /app
 
@@ -86,7 +60,6 @@ COPY server/ ./server/
 # -----------------------------
 # Create Required Directories
 # -----------------------------
-RUN mkdir -p /app/server/.wwebjs_auth
 RUN mkdir -p /app/server/data
 
 EXPOSE 3001

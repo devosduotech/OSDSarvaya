@@ -97,7 +97,22 @@ function cleanChromiumLocks(dir) {
 }
 
 async function initializeWhatsAppClient() {
-    if (waClient) return waClient;
+    if (waClient) {
+        const activeStatuses = ['CONNECTING', 'SCAN_QR', 'AUTHENTICATED', 'CONNECTED'];
+        if (activeStatuses.includes(waStatus)) {
+            return waClient;
+        }
+
+        // A client object can survive after the underlying browser has died.
+        // Reusing it would leave the UI stuck on "CONNECTING" forever.
+        logger.info(`Discarding stale WhatsApp client (status: ${waStatus})`);
+        try {
+            await waClient.destroy();
+        } catch (err) {
+            logger.warn({ err }, 'Failed to destroy stale WhatsApp client');
+        }
+        waClient = null;
+    }
 
     logger.info('Starting WhatsApp initialization...');
 
@@ -116,25 +131,12 @@ async function initializeWhatsAppClient() {
             logger.info('Initializing WhatsApp Client...');
 
             const puppeteerOptions = {
-                headless: "new",
+                headless: true,
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--disable-features=VizDisplayCompositor',
-                    '--disable-background-networking',
-                    '--disable-default-apps',
-                    '--disable-extensions',
-                    '--disable-sync',
-                    '--disable-translate',
-                    '--metrics-recording-only',
-                    '--mute-audio',
-                    '--no-first-run',
-                    '--safebrowsing-disable-auto-update',
-                    '--disable-gpu-process-crash-dump',
-                    '--disable-software-rasterizer',
-                    '--no-default-browser-check',
+                    '--disable-gpu'
                 ]
             };
 
@@ -161,6 +163,10 @@ async function initializeWhatsAppClient() {
 
             waClient = new Client({
                 authStrategy: new LocalAuth({ dataPath: getSessionPath() }),
+                // Always load the live WhatsApp Web build. A stale local
+                // version cache is a common cause of the `ready` event
+                // never firing after authentication.
+                webVersionCache: { type: 'none' },
                 puppeteer: puppeteerOptions,
                 restartOnAuthFail: true
             });
@@ -182,6 +188,17 @@ async function initializeWhatsAppClient() {
                 logger.info('WhatsApp authenticated successfully');
                 changeStatus('AUTHENTICATED');
                 emitActivity('whatsapp', 'WhatsApp authenticated successfully');
+
+                // Guard against WhatsApp Web loading forever (usually caused
+                // by an outdated bundled browser). Without this the UI would
+                // stay on "Authenticating..." indefinitely.
+                if (global.readyTimeout) clearTimeout(global.readyTimeout);
+                global.readyTimeout = setTimeout(() => {
+                    if (waStatus === 'AUTHENTICATED') {
+                        logger.error('WhatsApp authenticated but did not become ready within 120s. The browser build may be too old.');
+                        changeStatus('FAILED');
+                    }
+                }, 120000);
             });
 
             waClient.on('state_change', (state) => {
@@ -191,12 +208,14 @@ async function initializeWhatsAppClient() {
 
             waClient.on('ready', () => {
                 logger.info(`WhatsApp READY: ${waClient.info?.wid?._serialized}`);
+                if (global.readyTimeout) clearTimeout(global.readyTimeout);
                 changeStatus('CONNECTED');
                 emitActivity('whatsapp', 'WhatsApp connected');
             });
 
             waClient.on('disconnected', (reason) => {
                 logger.info(`WhatsApp disconnected: ${reason}`);
+                if (global.readyTimeout) clearTimeout(global.readyTimeout);
                 changeStatus('DISCONNECTED');
                 emitActivity('whatsapp', 'WhatsApp disconnected, attempting to reconnect...');
 
@@ -215,6 +234,7 @@ async function initializeWhatsAppClient() {
 
             waClient.on('auth_failure', (msg) => {
                 logger.error({ msg }, 'WhatsApp AUTH FAILURE');
+                if (global.readyTimeout) clearTimeout(global.readyTimeout);
                 changeStatus('AUTH_FAILED');
                 emitActivity('whatsapp', `WhatsApp authentication failed: ${msg}`);
             });
@@ -280,14 +300,16 @@ async function initializeWhatsAppClient() {
     return attemptInit();
 }
 
-async function destroyWhatsAppClient() {
+async function destroyWhatsAppClient(removeSession = true) {
     if (waClient) {
         await waClient.destroy();
         waClient = null;
     }
-    const sessionPath = getSessionPath();
-    if (fs.existsSync(sessionPath)) {
-        fs.rmSync(sessionPath, { recursive: true, force: true });
+    if (removeSession) {
+        const sessionPath = getSessionPath();
+        if (fs.existsSync(sessionPath)) {
+            fs.rmSync(sessionPath, { recursive: true, force: true });
+        }
     }
     changeStatus('DISCONNECTED');
 }

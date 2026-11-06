@@ -1,0 +1,68 @@
+name: Windows Installer (NSIS)
+
+# Builds OSDSarvayaSetup.exe and attaches it to the GitHub release.
+# - Tag push `v2.0.2` -> builds installer from that commit and creates/updates
+#   the release for the tag.
+# - Manual dispatch   -> builds from the chosen ref and uploads the installer
+#   as a workflow artifact (no release created).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: client/package.json
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm install --no-audit --no-fund
+
+      - name: Download Chrome for Windows (bundled runtime)
+        working-directory: client
+        run: node scripts/download-chromium.cjs
+
+      - name: Build client + copy server runtime
+        working-directory: client
+        run: npm run build:all
+
+      - name: Package Windows installer
+        working-directory: client
+        run: npx electron-builder --win --publish never
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OSDSarvaya-windows-installer
+          path: |
+            client/release/OSDSarvayaSetup.exe
+            client/release/OSDSarvayaSetup.exe.blockmap
+            client/release/latest.yml
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach installer to release
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            client/release/OSDSarvayaSetup.exe
+            client/release/OSDSarvayaSetup.exe.blockmap
+            client/release/latest.yml
+          generate_release_notes: true

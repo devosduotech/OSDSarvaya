@@ -124,6 +124,7 @@ const Settings: React.FC = () => {
       case 'DISCONNECTED': return 'Disconnected';
       case 'FAILED': return 'Failed';
       case 'SCAN_QR': return 'Scan QR';
+      case 'AUTHENTICATED': return 'Authenticating...';
       default: return 'Unknown';
     }
   };

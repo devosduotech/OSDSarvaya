@@ -1,6 +1,6 @@
 # OSDSarvaya — User Manual
 
-Applies to **v2.0.1**.
+Applies to **v2.0.2**.
 
 ## 1. Introduction
 
@@ -48,19 +48,21 @@ ERPNEXT_API_SECRET=<secret>
 ```bash
 git clone https://github.com/devosduotech/OSDSarvaya.git
 cd OSDSarvaya
-APP_VERSION=2.0.1 docker compose up -d --build     # or: docker compose pull && docker compose up -d
+docker compose pull          # use the pre-built GHCR image
+docker compose up -d
+# or pin an exact version: APP_VERSION=2.0.2 docker compose up -d
 ```
 
 The compose file persists:
-- `./osdsarvaya_session` → WhatsApp Web login session
-- `./osdsarvaya_data` → SQLite database + license cache
+- `./osdsarvaya_data` → SQLite database + WhatsApp Web login session +
+  license cache (single volume since v2.0.2)
 
 Healthcheck runs every 30s against `/api/health`.
 
 ### 3.2 Pre-built image
 
 ```bash
-docker pull ghcr.io/devosduotech/osdsarvaya:2.0.1   # or :latest
+docker pull ghcr.io/devosduotech/osdsarvaya:2.0.2   # or :latest
 ```
 
 ### 3.3 Windows desktop

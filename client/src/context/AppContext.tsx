@@ -26,6 +26,7 @@ export type WhatsAppStatus =
   | 'DISCONNECTED'
   | 'CONNECTING'
   | 'SCAN_QR'
+  | 'AUTHENTICATED'
   | 'CONNECTED'
   | 'FAILED';
 
