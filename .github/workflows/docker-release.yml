@@ -36,7 +36,10 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # The user-owned `osdsarvaya` package is not linked to this
+          # repository, so GITHUB_TOKEN cannot push to it (write_package
+          # denied). A PAT with write:packages is stored as GHCR_TOKEN.
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Derive version tag
         id: version
