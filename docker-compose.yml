@@ -1,10 +1,11 @@
 services:
   osdsarvaya:
-    image: ghcr.io/devosduotech/osdsarvaya:${APP_VERSION:-2.0.1}
-    build:
-      context: .
-      args:
-        APP_VERSION: ${APP_VERSION:-2.0.1}
+    # Pre-built image from GitHub Container Registry — `docker compose up -d`
+    # pulls and never builds locally. For local builds see docker-compose.build.yml.
+    image: ghcr.io/devosduotech/osdsarvaya:${APP_VERSION:-2.0.2}
+    # Always check the registry so a pinned tag picks up a re-published digest,
+    # and `APP_VERSION=latest` gets fresh images on every `up`.
+    pull_policy: always
     container_name: osdsarvaya-app
     ports:
       - "3001:3001"
@@ -13,11 +14,19 @@ services:
       - production.env
 
     environment:
-      - APP_VERSION=${APP_VERSION:-2.0.1}
+      - APP_VERSION=${APP_VERSION:-2.0.2}
       - TZ=Asia/Kolkata
 
+    # The host runs systemd-resolved on 127.0.0.53, which intermittently
+    # times out for WhatsApp domains inside containers. Use public resolvers
+    # directly so WhatsApp Web can reach its servers.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+
     volumes:
-      - ./osdsarvaya_session:/app/server/.wwebjs_auth
+      # The database and the WhatsApp session both live under server/data
+      # (see getDataPath()/getSessionPath() in whatsappClient.js).
       - ./osdsarvaya_data:/app/server/data
 
     restart: unless-stopped
@@ -34,8 +43,5 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1g
-
-volumes:
-  osdsarvaya_session:
-  osdsarvaya_data:
+          # Chromium + Node commonly peak above 1 GB while WhatsApp Web loads.
+          memory: 2g

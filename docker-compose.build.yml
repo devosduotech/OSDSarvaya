@@ -1,0 +1,13 @@
+# Local build helper for developers.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Normal deployments should NOT use this file — the base docker-compose.yml
+# pulls the pre-built image from GHCR.
+services:
+  osdsarvaya:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-2.0.2}
+    pull_policy: build

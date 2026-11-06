@@ -1,0 +1,83 @@
+name: Docker Release (GHCR)
+
+# Publishes OSDSarvaya to ghcr.io/devosduotech/osdsarvaya.
+# - Tag push `v2.0.2`  -> images `:2.0.2` and `:latest`
+# - Manual dispatch    -> images `:<version input or commit short sha>` and `:latest`
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to tag (e.g. 2.0.2). Leave empty to use the short commit SHA.'
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/devosduotech/osdsarvaya
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive version tag
+        id: version
+        env:
+          DISPATCH_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ -n "$DISPATCH_VERSION" ]; then
+            V="$DISPATCH_VERSION"
+          else
+            V="${GITHUB_REF_NAME#v}"
+            case "$V" in
+              [0-9]*.[0-9]*) ;;            # came from a v-prefixed tag
+              *) V="$(echo "${GITHUB_SHA}" | cut -c1-7)" ;;
+            esac
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      # Build x86_64 only: production servers and the Windows Electron build
+      # live in this arch; adding arm64 roughly doubles CI time.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.title=OSDSarvaya
+            org.opencontainers.image.description=WhatsApp Bulk Messaging Application
+            org.opencontainers.image.vendor=OSDuo Tech
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Summary
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo "Published \`${IMAGE}:${VERSION}\` and \`${IMAGE}:latest\`" >> "${GITHUB_STEP_SUMMARY}"

@@ -339,8 +339,15 @@ app.get('/api/campaigns/failed/:runId', verifyToken, async (req, res) => {
 app.post('/api/whatsapp/connect', verifyToken, async (req, res) => {
     logger.info(`WhatsApp connect API called, waStatus: ${whatsappClient.getStatus()}`);
 
-    if (whatsappClient.getClient() && whatsappClient.getStatus() === 'CONNECTED') {
-        return res.json({ success: true, status: whatsappClient.getStatus(), message: 'WhatsApp already connected' });
+    // A client may already be starting up or waiting for the QR scan.
+    // Forcing the status back to CONNECTING here would leave the UI stuck.
+    const inProgress = ['CONNECTING', 'SCAN_QR', 'AUTHENTICATED', 'CONNECTED'];
+    if (whatsappClient.getClient() && inProgress.includes(whatsappClient.getStatus())) {
+        return res.json({
+            success: true,
+            status: whatsappClient.getStatus(),
+            message: 'WhatsApp connection already in progress'
+        });
     }
 
     whatsappClient.changeStatus('CONNECTING');
@@ -393,6 +400,7 @@ io.on('connection', (socket) => {
         logger.info(`connect_wa received, current waStatus: ${whatsappClient.getStatus()}`);
         if (whatsappClient.getClient()) {
             logger.info('WhatsApp client already exists, skipping init');
+            socket.emit('status_change', whatsappClient.getStatus());
             return;
         }
         whatsappClient.changeStatus('CONNECTING');
@@ -463,7 +471,9 @@ async function gracefulShutdown() {
         await db.run('SELECT 1');
         logger.info('Final database save completed');
 
-        await whatsappClient.destroyWhatsAppClient();
+        // Keep the WhatsApp session on disk so a container restart does not
+        // force the user to scan the QR code again.
+        await whatsappClient.destroyWhatsAppClient(false);
     } catch (err) {
         logger.error({ err }, 'Shutdown error');
     } finally {

@@ -4,7 +4,7 @@
 
 WhatsApp Bulk Messaging Application by OSDuo Tech
 
-**Current version: v2.0.1**
+**Current version: v2.0.2**
 
 </div>
 
@@ -22,18 +22,25 @@ WhatsApp Bulk Messaging Application by OSDuo Tech
 
 ### Ubuntu / Docker
 
-Pull the pre-built image from GitHub Container Registry:
-
-```bash
-docker pull ghcr.io/devosduotech/osdsarvaya:latest   # or pin: :2.0.1
-```
-
-Or build locally with Docker Compose:
+Every release publishes pre-built images to GHCR. Docker Compose **pulls** — it
+never builds locally:
 
 ```bash
 git clone https://github.com/devosduotech/OSDSarvaya.git
 cd OSDSarvaya
-APP_VERSION=2.0.1 docker compose up -d --build
+docker compose pull && docker compose up -d
+```
+
+Or pin a specific version (recommended for production):
+
+```bash
+APP_VERSION=2.0.2 docker compose up -d
+```
+
+To build a custom image locally instead:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
 Access at: http://localhost:3001

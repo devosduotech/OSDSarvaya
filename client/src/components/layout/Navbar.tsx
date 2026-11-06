@@ -51,6 +51,7 @@ const Navbar: React.FC<NavbarProps> = ({ title }) => {
       case 'CONNECTED': return 'Connected';
       case 'CONNECTING': return 'Connecting';
       case 'SCAN_QR': return 'Scan QR';
+      case 'AUTHENTICATED': return 'Authenticating';
       case 'FAILED': return 'Failed';
       default: return 'Disconnected';
     }
